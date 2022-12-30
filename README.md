@@ -426,22 +426,234 @@ set unset file line numbers in vi:
 :set nu! 
 sudo nginx -t
 sudo systemctl reload nginx
+```
+![nginxContext.png](diagrams%2FnginxContext.png)
+![locationModifiers.png](diagrams%2FlocationModifiers.png)
+- exact modifier 
+  - `location = /xmlrpc.php { deny all; }` will only have this `example.com/xmlrpc.php`
+- no modifier - prefix match that's case-sensitive
+  - `location = /tax { return 301 example.com; }` will only have this `example.com/tax*`
+  - regular exp match `(~and~*)` - `case sensitive ~`  `case insensitive ~*`
+  - `location ~ \.ico$ { deny all; }` will only have this `.ico`
+  - `location ~* \.ico$ { deny all; }` will also have this `.ICo`
+- try_files directive - checks the existence of files in the specified order 
+  and uses the first found file for request processing.
+    - `location / { try_files $uri $uri/ /other/index.html; }` 
+    - if it exists, serve it `/var/www/example.com/public_html/image.jpg`
+    - if not move to the next condition
+    - wp pretty permalinks
+        - `location / { try_files $uri $uri/ /index.php$is_args$args; }`
+    - usage
+      ![try_files.png](diagrams%2Ftry_files.png)
 
+
+### Harden and optimize NGINX
+- default nginx config is secure
+- improve performance and security
+- 'include' directive - use to organize config files
+```
 cd /etc/nginx/
 sudo mkdir includes/
 sudo cp nginx.conf nginx.conf.bak
 sudo vi nginx.conf
 
-MAIN
-Add the following directives to the main context:
+MAIN CONTEXT
+Add the following directives to the main context: (after `worker_processes auto;`)
 worker_rlimit_nofile 30000;
 worker_priority -10;
 timer_resolution 100ms;
 pcre_jit on;
-```
-![nginxContext.png](diagrams%2FnginxContext.png)
-![locationModifiers.png](diagrams%2FlocationModifiers.png)
 
+EVENTS CONTEXT
+Modify and add the following directives to the events context:
+worker_connections 4096;
+accept_mutex on;
+accept_mutex_delay 200ms;
+use epoll;
+
+sudo nginx -t
+cd /etc/nginx/includes
+sudo touch basic_settings.conf buffers.conf timeouts.conf file_handle_cache.conf gzip.conf brotli.conf
+ls -l
+
+sudo vi basic_settings.conf
+# BASIC SETTINGS - Deals with optimization and security
+ i.e. specifying the character is important because it lets the browser know how it should display the web page.
+ Provides the browser the ability to to begin parsing hence reduced latency time.
+ Turn server tokens off to prevent info leakage
+
+charset utf-8;
+sendfile on;
+sendfile_max_chunk 512k;
+tcp_nopush on;
+tcp_nodelay on;
+server_tokens off;
+more_clear_headers 'Server';
+more_clear_headers 'X-Powered';
+server_name_in_redirect off;
+server_names_hash_bucket_size 64;
+variables_hash_max_size 2048;
+types_hash_max_size 2048;
+
+include /etc/nginx/mime.types;
+
+
+sudo vi buffers.conf
+# BUFFERS - region in memory storage used temporarily store data while it is being moved from one place to another.
+    - Also used in moving data betwwen processes within a computer.
+    - Setting too low, nginx will constantly use io to write remaining parts to file.
+    - Setting too high, nginx will make yourself vulnerable to DDoS attacks where the attacker can open all server connections.
+    - By limiting the buffers you prevent clients from overwhelming the resources of the server.
+    - reduce this to 16m later -> client_max_body_size 100m;
+
+client_body_buffer_size 256k;
+client_body_in_file_only off;
+client_header_buffer_size 64k;
+# client max body size - reduce size to 16m after setting up site
+# Large value is to allow theme, plugins or asset uploading.
+client_max_body_size 100m;
+connection_pool_size 512;
+directio 4m;
+ignore_invalid_headers on;
+large_client_header_buffers 8 64k;
+output_buffers 8 256k;
+postpone_output 1460;
+request_pool_size 32k;
+
+
+sudo vi timeouts.conf
+# TIMEOUTS - http persitent connections - the web server saves open connections which consumes CPU time and memory.
+    - It sits when the connections are closed.
+    - Connections are closed after a specified period of inativity.
+    - It ensures that the connections do not persist indefinitely.
+
+keepalive_timeout 5;
+keepalive_requests 500;
+lingering_time 20s;
+lingering_timeout 5s;
+keepalive_disable msie6;
+reset_timedout_connection on;
+send_timeout 15s;
+client_header_timeout 8s;
+client_body_timeout 10s;
+
+
+sudo vi gzip.conf
+# GZIP - Enabling gzip will reduce the weight of the response, hence the request will appear faster on the client side.
+
+gzip on;
+gzip_vary on;
+gzip_disable "MSIE [1-6]\.";
+gzip_static on;
+gzip_min_length 1400;
+gzip_buffers 32 8k;
+gzip_http_version 1.0;
+gzip_comp_level 5;
+gzip_proxied any;
+gzip_types text/plain text/css text/xml application/javascript application/x-javascript application/xml application/xml+rss application/ecmascript application/json image/svg+xml;
+
+
+sudo vi brotli.conf
+# BROTLI - Also enable brotli compression - Will show on Accept encoding request header.
+
+brotli on;
+brotli_comp_level 6;
+brotli_static on;
+brotli_types application/atom+xml application/javascript application/json application/rss+xml application/vnd.ms-fontobject application/x-font-opentype application/x-font-truetype application/x-font-ttf application/x-javascript application/xhtml+xml application/xml font/eot font/opentype font/otf font/truetype image/svg+xml image/vnd.microsoft.icon image/x-icon image/x-win-bitmap text/css text/javascript text/plain text/xml;
+
+
+sudo vi file_handle_cache.conf
+# FILE HANDLE CACHE - Will cache metadata about the file but not the content.
+
+open_file_cache max=50000 inactive=60s;
+open_file_cache_valid 120s;
+open_file_cache_min_uses 2;
+open_file_cache_errors off;
+
+# Buffer Settings
+include /etc/nginx/includes/buffers.conf;
+
+# Timeout Settings
+include /etc/nginx/includes/timeouts.conf;
+
+# File Handle Cache Settings
+include /etc/nginx/includes/file_handle_cache.conf;
+
+Include the files to main config:
+cd ..
+sudo vi nginx.conf
+user www-data;
+worker_processes auto;
+worker_rlimit_nofile 30000;
+worker_priority -10;
+timer_resolution 100ms;
+pcre_jit on;
+pid /run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+
+events {
+        worker_connections 4096;
+        accept_mutex on;
+        accept_mutex_delay 200ms;
+        use epoll;
+}
+
+http {
+
+        # Basic Settings
+        include /etc/nginx/includes/basic_settings.conf;
+        # Buffer Settings
+        include /etc/nginx/includes/buffers.conf;
+        # Timeouts Settings
+        #include /etc/nginx/includes/timeouts.conf;
+
+        ##
+        # Logging Settings
+        ##
+
+        access_log off;
+        # access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log;
+
+        # Gzip Settings
+        include /etc/nginx/includes/gzip.conf;
+        # Brotli Settings
+        include /etc/nginx/includes/brotli.conf;
+
+        ##
+        # Virtual Host Configs
+        ##
+
+        include /etc/nginx/conf.d/*.conf;
+        include /etc/nginx/sites-enabled/*;
+}
+
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+On 'too many open files error'
+- check current limit, increse limit, confirm new limit
+Get nginx process ID:
+ps aux | grep www-data
+view open file limits:
+cat /proc/nginx_pId/limits
+sudo vi nginx.conf
+sudo systemctl reload nginx
+```
+
+- Bash Aliases
+```
+cd
+nano .bash_aliases
+alias server_update='sudo apt update && sudo apt upgrade && sudo apt autoremove'
+alias ngt='sudo nginx -t'
+alias ngr='sudo systemctl reload nginx'
+alias fpmr='sudo systemctl restart php8.1-fpm'
+alias ngsa='cd /etc/nginx/sites-available/ && ls'
+alias ngin='cd /etc/nginx/includes/ && ls'
+su <user>
+```
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
