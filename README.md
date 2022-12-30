@@ -7,11 +7,440 @@
 ## Contents
 
 * [Deciding for a VPS hosting service](#deciding-for-a-vps-hosting-service)
+* [Account Flow](#account-flow)
 
 
 ### Deciding for a VPS hosting service
-* Make a VPS on your favorite hosting provider i.e AWS, Digital Ocean, Google Cloud etc.
+* Make a VPS on your favorite hosting provider i.e AWS, Digital Ocean, Google Cloud, Vultr etc.
 
+### Account Flow
+1. Login to the account, secure it with 2-factor auth.
+2. Create server instance.
+3. Choose Cloud Compute(VPS)
+4. Choose Intel Regular - for test env
+5. Choose Server location
+6. Choose Server Image - Ubuntu 22.04 LTS
+7. Choose server size
+8. Enable/disable auto backup
+9. Disable ipv6
+10. Add Server hostname
+11. SSH on your new server. ```ssh root@<ip>```
+12. Change password ```passwd```
+13. Add non-root user ```adduser <name>```
+14. List dir ```ls /home```
+15. Delete user ```deluser ubuntu --remove-home```
+16. Change password of current user ```passwd <name>```
+17. Set default text editor ```update-alternatives --config editor```
+18. Set user privileges of new user ```visudo```
+19. Disable root login ```vi /etc/ssh/sshd_config``` ```PermitRootLogin no```
+20. Make backup of ssh config file ```cp sshd_config sshd_config.bak```
+21. Store back to original file from backup ```cp sshd_config.bak sshd_config```
+22. Restart services after changing configuration ```systemctl restart ssh```
+23. Clear sudo cache ```sudo -k```
+
+### Basic Server Hardening
+1. Enable SSH login ```ssh-copy-id -i .ssh/id_rsa.pub <name>@<ip>``` 
+2. Put this on ssh_config file 
+```
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys .ssh/authorized_keys2
+PasswordAuthentication no
+```
+3. Restart ssh service ```sudo systemctl restart ssh```
+4. Local ssh config file ```sudo vi ~/.ssh/config```
+```
+Host myserver
+Hostname 45.76.36.153
+User will
+IdentityFile ~/.ssh/id_rsa
+ServerAliveInterval 60
+ServerAliveCountMax 120 
+```
+5. Update server ```sudo apt update```
+6. Upgrade server ```sudo apt upgrade```
+7. Remove obsolete packages server ```sudo apt autoremove```
+8. Reboot ```sudo reboot```
+9. Firewall - lock the server, only allow  22, 443, 80 -- use cloud firewall
+> Vultr Firewall [@firewall](https://www.vultr.com/docs/firewall-quickstart-for-vultr-cloud-servers/#Which_Firewall_Does_My_Server_Use_)
+![VultrFirewall.png](diagrams%2FVultrFirewall.png)
+10. ```sudo ufw status verbose```
+10. ```sudo ufw allow http```
+11. ```sudo ufw allow https/tcp```
+12. ```sudo ufw default deny incoming```
+13. ```sudo ufw default allow outgoing```
+14. ```sudo ufw allow ssh```
+15. ```sudo ufw enable```
+16. Make a firewall group on vultr - configure it and linked the instance to your current server.
+17. Only allow your ip to ssh
+18. Block unwanted ips that are trying to request too many login attempts
+19. Install Fail2Ban 
+```
+sudo apt update
+sudo apt install fail2ban
+sudo systemctl enable fail2ban
+sudo systemctl status fail2ban
+cd /etc/fail2ban
+sudo cp jail.conf jail.local
+```
+20. config file is jail.conf
+21. Ban the host for 7days ```bantime  = 604800s```
+22. If you exceed the maxretry on a specified findtime host is banned for the bantime ```findtime  = 30800s```
+22. Set maxretry to 3 times ```maxretry  = 3```
+23. Too long find time will result to wasted cpu cycles and memory usage
+24. Use aggressive sshd ```mode=aggressive```
+24. ```enabled=true```
+24. ```sudo systemctl restart fail2ban```
+25. ```/var/log/fail2ban.log```
+25. ```sudo less /var/log/fail2ban.log```
+26. Unban an Ip ```sudo fail2ban-client set sshd unbanip <ip>```
+
+### Hardened and optimize server distribution/OS (Performance and Security)
+1. Set the timezone of the server. 
+```
+sudo timedatectl
+sudo timedatectl list-timezones
+sudo timedatectl list-timezones | grep <City>
+sudo timedatectl set-timezone Europe/Amsterdam
+```
+2. SWAP - space on disk allocated when physical memory is full.
+3. Verify swap status ```htop```
+4. Change Swapiness and cache pressure
+```
+sudo cp /etc/sysctl.conf /etc/sysctl.conf.bak
+add at the end of the file
+vm.swappiness = 1
+vm.vfs_cache_pressure = 50
+
+sudo sysctl -p
+allocate 1g of swapfile
+sudo fallocate -l 1G /swapfile
+change swapfile permission
+sudo chmod 600 swapfile
+sudo mkswap /swapfile
+enable swap file
+sudo swapon /swapfile
+
+Ensure that swapfile persists after a server reboots
+cp /etc/fstab /etc/fstab.bak
+/swapfile swap swap defaults 0 0
+
+sudo reboot
+cp /etc/sysctl.conf /etc/sysctl.conf.bak
+enable changes 
+sudo sysctl -p
+```
+5. Shared memory space - used to exchange data between programs
+6. Lock down shared memory space - Secure the shared memory
+```
+sudo vi fstab
+none /run/shm tmpfs defaults,ro 0 0
+# none /run/shm tmpfs rw,noexec,nosuid,nodev 0 0
+sudo reboot
+
+mount
+Make sure these lines are there:
+none on /run/credentials/systemd-sysusers.service type ramfs (ro,nosuid,nodev,noexec,relatime,mode=700)
+none on /run/shm type tmpfs (ro,relatime,inode64)
+```
+7. Harden and optimize the network layer
+```
+allows admin to change kernel parameters
+sudo sysctl -a
+sudo vi sysctl.conf
+uncomment these lines:
+net.ipv4.conf.default.rp_filter=1
+net.ipv4.conf.all.rp_filter=1
+net.ipv4.tcp_syncookies=1
+net.ipv4.tcp_max_syn_backlog=2048
+net.ipv4.tcp_synack_retries=2
+net.ipv4.tcp_syn_retries=5
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv6.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+net.ipv6.conf.default.accept_source_route = 0
+
+enable changes:
+sudo sysctl -p
+
+# Increase number of usable ports:
+net.ipv4.ip_local_port_range = 1024 65535
+
+# Increase the size of file handles and inode cache and restrict core dumps:
+fs.file-max = 2097152
+fs.suid_dumpable = 0
+
+# Change the number of incoming connections and incoming connections backlog:
+net.core.somaxconn = 65535
+net.core.netdev_max_backlog = 262144
+
+# Increase the maximum amount of memory buffers:
+net.core.optmem_max = 25165824
+
+# Increase the default and maximum send/receive buffers:
+net.core.rmem_default = 31457280
+net.core.rmem_max = 67108864
+net.core.wmem_default = 31457280
+net.core.wmem_max = 67108864
+
+enable changes:
+sudo sysctl -p
+```
+7. Install a system tuning tool - optimized and configured for performance
+profile-base system tuning tool - for static and dynamic tuning of systems
+```
+sudo apt update
+sudo apt install tuned
+sudo tuned-adm list
+sudo tuned-adm profile <profile-name-from-list>
+sudo tuned-adm profile throughput-performance
+sudo tuned-adm active
+```
+8. Congestion Control
+    - Congestion Control Algo decide how fast to send data.
+    - Implement BBR and RTT throughput.
+    - BBR uses latency instead of lost packets as a primary factor to determine how fast the sending rate should be.
+9. List all available congestion control algo.
+```
+List available congestion control algorithms:
+sudo sysctl net.ipv4.tcp_available_congestion_control
+
+List your current congestion control setting:
+sudo sysctl net.ipv4.tcp_congestion_control
+
+To enable BBR, need enable kernel module tcp_bbr:
+sudo modprobe tcp_bbr
+sudo bash -c 'echo "tcp_bbr" > /etc/modules-load.d/bbr.conf'
+
+After modprobe tcp_bbr, bbr should be available in the list of tcp_available_congestion_control:
+sudo sysctl net.ipv4.tcp_available_congestion_control
+```
+10. File Access Time - Disable file access times, it's seldom useful and causes an io operation every time file is read.
+```
+Check default parameters after the server booted:
+cat /proc/mounts
+Look for this line:
+/dev/vda1 / ext4 rw,relatime 0 0
+
+Add this line to fstab file:
+sudo vi /etc/fstab
+/dev/disk/by-uuid/f9119fcd-716a-45d9-ba7c-e145c5b95fe2 / ext4 defaults,noatime 0 1
+sudo reboot
+cat /proc/mounts
+Look for this line:
+/dev/vda1 / ext4 rw,noatime 0 0
+```
+11. Open File Limits -Since sockets are considered files on a linux system, this limit the concurrent connections as well.
+    - maximum number of open files allowed per process
+    - Hard limit is the maximum value of the soft limit
+    - Soft limit is used to limit the system resources for running non-root processes. 
+      - Can't exceed hard limit.
+    - Make sure to set the open file limits to each of these stacks: nginx | mariadb | php
+```
+ulimit -Hn
+ulimit -Sn
+cd /etc/security
+sudo cp limits.conf limits.conf.bak
+Add the following to the limits.conf file
+    *       soft    nofile      999999
+    *       hard    nofile      999999
+    root    soft    nofile      999999
+    root    hard    nofile      999999
+    
+sudo reboot
+ulimit -Hn
+ulimit -Sn
+
+PLUGGABLE AUTHENTICATION MODULES (PAM)
+You need to edit the following two files in the `/etc/pam.d/`` directory and 
+add the directives as indicated to allow a higher value for the maximum open file limit:
+
+The files are:
+`common-session` and `common-session-noninteractive`
+
+Make backup:
+sudo cp common-session common-session.bak
+sudo cp common-session-noninteractive common-session-noninteractive.bak
+
+You need to add the following line to the file `common-session`:
+session required pam_limits.so
+
+The easiest way is to invoke a root shell:
+sudo bash -c 'echo session required pam_limits.so >> /etc/pam.d/common-session'
+
+You need to add the following line to the file `common-session-noninteractive`
+session required pam_limits.so
+
+The easiest way is to invoke a root shell:
+sudo bash -c 'echo session required pam_limits.so >> /etc/pam.d/common-session-noninteractive'
+
+Reboot the server to enable the above changes:
+sudo reboot
+```
+12. Buy a domain name and configure dns settings in cloudflare
+```
+A        <your_domain>     <your_server_ip>     DNS only    Auto
+CNAME    www               <your_domain>        DNS only    Auto
+```
+
+### Installing LEMP Stack
+Only download official ubuntu package.
+Ondrej nginx repo
+Ondrej php repo
+mariadb repo
+```
+sudo apt update && sudo apt upgrade
+
+Search for a package:
+sudo apt-cache search iftop
+sudo apt-cache show iftop
+sudo apt install iftop
+sudo iftop
+sudo apt remove iftop
+sudo apt purge iftop
+
+NGINX
+sudo add-apt-repository ppa:ondrej/nginx
+sudo apt install nginx libnginx-mod-http-cache-purge libnginx-mod-http-headers-more-filter
+sudo systemctl status nginx
+
+Fix this: (nginx and systemd are competing for resources)
+host2204 systemd[1]: nginx.service: Failed to parse PID from file /run/nginx.pid: Invalid argument
+sudo vi /usr/lib/systemd/system/nginx.service
+Add this directive on [Service]:
+ExecStartPost=/bin/sleep 1
+
+sudo systemctl daemon-reload
+sudo systemctl restart nginx
+sudo systemctl status nginx
+curl -I http://<your_server__ip>
+curl -i http://<your_server__ip>
+
+ls /var/www/html/
+nginx -v
+
+Make nginx start automatically after a reboot:
+sudo reboot
+sudo systemctl status nginx
+sudo systemctl enable nginx
+
+MARIADB
+curl -LsS https://r.mariadb.com/downloads/mariadb_repo_setup | sudo bash
+sudo apt install mariadb-server mariadb-client
+sudo systemctl status mariadb
+
+
+PHP8.1
+sudo add-apt-repository ppa:ondrej/php
+sudo apt install php8.1-{fpm,gd,mbstring,mysql,xml,xmlrpc,opcache,cli,zip,soap,intl,bcmath,curl,imagick,ssh2}
+
+Check the status of php-fpm
+sudo systemctl status php8.1-fpm
+```
+![phpfpm.png](diagrams%2Fphpfpm.png)
+
+
+### Server Mail
+- Configure the server to send mail without plugins.
+- MSMTP mail provider -  lightweight mail client
+- Get msmtp password on Google account: 2 factor has to enabled to get this.
+```
+sudo apt install msmtp msmtp-mta
+sudo vi .msmtprc
+
+Put this config:
+# Modify DIRECTIVES in CAPS
+defaults
+# Set Account Name
+account gmail
+# TLS Directives - Do Not Modify
+tls on
+tls_starttls on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+# Set Host Information
+host smtp.gmail.com
+port 587
+auth on
+user <my_email>
+password <my_password>
+from <my_email>
+# Set Account Default
+account default : gmail
+
+sudo chmod 600 .msmtprc
+
+Test sending of mail from cli:
+msmtp <email>
+type a message
+ctrl+d
+
+ls /etc/apparmor.d/ -l
+ls /etc/apparmor.d/disable/ -l
+```
+- Configure php mailer
+```
+Create a new config file:
+sudo cp .msmtprc /etc/msmtprc
+cd /etc
+sudo chown www-data msmtprc
+sudo chmod 600 msmtprc
+
+Edit the php.ini and specify the path to send mail:
+cd /etc/php/8.1/fpm/
+sudo cp php.ini php.ini.bak
+sudo vi php.ini
+
+put this after sendmail portion:
+sendmail_path = "/usr/bin/msmtp -C /etc/msmtprc -t"
+
+sudo systemctl restart php8.1-fpm && sudo systemctl reload nginx
+cd
+vi php_mail_test.php
+ls /home/ -l
+cd /home
+sudo chmod 755 will/
+cd
+sudo -u www-data php php_mail_test.php
+cd /home
+sudo chmod 750 andrew/
+rm php_mail_test.php
+```
+
+### In-Depth NGINX
+- directives, contexts - location context modifiers, try_files directive
+- Nginx consists of modules controlled by directives.
+- Directives consist of an option or parameter name followed by the option or parameter value.
+- Directives end with a semicolon
+- Context - Also a directive that encloses other directives {}
+  - main, events, http, server, location
+  - child context will override parent context
+  - response depends on the modifier
+```
+cd /etc/nginx/sites-available/
+sudo vi default
+Change 
+root /var/www/html; to roots /var/www/html;
+sudo nginx -t
+fix syntax error
+set unset file line numbers in vi:
+:set nu! 
+sudo nginx -t
+sudo systemctl reload nginx
+
+cd /etc/nginx/
+sudo mkdir includes/
+sudo cp nginx.conf nginx.conf.bak
+sudo vi nginx.conf
+
+MAIN
+Add the following directives to the main context:
+worker_rlimit_nofile 30000;
+worker_priority -10;
+timer_resolution 100ms;
+pcre_jit on;
+```
+![nginxContext.png](diagrams%2FnginxContext.png)
+![locationModifiers.png](diagrams%2FlocationModifiers.png)
 
 ## Support
 
@@ -24,3 +453,27 @@ MIT
 ---
 
 > GitHub [@william](https://github.com/william251082)
+
+
+### Extras:
+REMOVE A SWAP FILE
+
+Deactivate the swap using the following command:
+```sudo swapoff -v /swapfile```
+
+Open the fstab file using nano:
+```sudo nano /etc/fstab```
+
+Remove the swap file entry from the /etc/fstab file.
+```/swapfile swap swap defaults 0 0```
+
+Delete the swapfile:
+```sudo rm /swapfile```
+
+Reboot the server
+```sudo reboot```
+ONE SWAP FILE REMOVED
+
+
+
+
