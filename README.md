@@ -1216,6 +1216,7 @@ ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
 # SSL STAPLING
 ssl_trusted_certificate /etc/letsencrypt/live/example.com/chain.pem;
 
+Write xxplanation on every line:
 sudo vi /etc/nginx/ssl/ssl_all_sites.conf
 # CONFIGURATION RESULTS IN A+ RATING AT SSLLABS.COM
 # WILL UPDATE DIRECTIIVES TO MAINTAIN A+ RATING - CHECK DATE
@@ -1238,6 +1239,44 @@ add_header Strict-Transport-Security "max-age=31536000;" always;
 # After settting up ALL of your sub domains - comment the above and uncomment the directive hereunder, then reload nginx
 # add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; " always;
 ```
+- nginx secure server blocks
+  - add a new non-secure server block
+  - to redirect all requests from http to https
+  - modify the existing non-secure server block
+  - convert the existing non-secure server block into a secure server block
+  - don't change the www to non www redirect to avoid 'too many redirects' error
+  - the site will keep in redirecting in a way that it'll never complete. (competing redirects)
+```
+cd /etc/nginx/sites-available
+sudo vi <your_domain>.conf
+server {
+    listen 80;
+    server_name example.com www.example.com;
+    # ADD REDIRECT TO HTTPS: 301 PERMANENT 302 TEMPORARY
+    return 301 https://example.com$request_uri;
+}
+ listen 443 ssl http2;
+ 
+include /etc/nginx/ssl/ssl_example.com;
+include /etc/nginx/ssl/ssl_all_sites.conf;
+
+test redirect:
+curl -I http://pristinehost.uk
+curl -I http://www.pristinehost.uk
+
+Purpose of HSTS Header:
+hsts https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security
+https://www.ssllabs.com/ssltest/
+```
+- https everywhere
+  - mixed content error messages
+  - site serving secure and insecure content
+  - open wp dashboard
+  - settings|General
+  - Change wp address (url) and the site address from http to https
+  
+    
+
 - http response headers
 - ownership and permissions
 - nginx directives
@@ -1252,6 +1291,7 @@ add_header Strict-Transport-Security "max-age=31536000;" always;
 ## License
 
 MIT
+https://pristinehost.uk
 
 ---
 
