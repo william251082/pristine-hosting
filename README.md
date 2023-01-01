@@ -982,7 +982,7 @@ sudo ./create_dirs.sh
 
 ### NGINX Server blocks
 - Used to host and serve multiple sites. Server host in apache.
-- Create seerver block in a file
+- Create server block in a file
 ```
 /etc/nginx/sites-available
 Create symlink for the server block from sites-available to the sites-enables dir
@@ -998,11 +998,33 @@ sites-available is included in /etc/nginx/nginc.conf
 │   └── default -> /etc/nginx/sites-available/default
 ```
 - Server block config
-    after creating a server block and symlink to /etc/nginx/sites-enabled
+  - after creating a server block and symlink to /etc/nginx/sites-enabled
   - test the nginx config
   - reload nginx to enable the server block
   - difference between reload and restart
-  - must use reload
+  - must use reload because restart stops and start the server, dropping all connection 
+  - hence when there's an error sever will stop and never be able to start
+  - in reload server will keep on running based on the old config that works.
+
+Create a server block
+- configure dns
+- create server block
+  - ports
+  - domain (hostname)
+  - site location
+  - index file
+  - pretty permalinks wp
+  - php
+  - logs
+  - Additional directives
+    - optimize the fastcgi process
+    - browser (http) caching
+    - > Http Caching [@httpCachingDocs](https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching)
+- install site
+```
+cd /etc/nginx/sites-available
+
+```
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
