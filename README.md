@@ -850,13 +850,108 @@ cat /proc/<pid>/limits
   - allow_url_fopen
   - cgi.fix_pathinfo
   - expose_php
+- optimize
+  - upload_max_filesize = 100M
+  - post_max_size = 125M
+  - max_execution_time = 30
+  - max_input_time = 60
+  - max_input_vars = 3000
+  - memory_limit = 128M
+  - memory_limit = 256M
+- opcache 
+- - caches the conversion of human-readable php to machine code.
+  - validate_timestamp - determine how often opcache must check php files for updated code.
+  - When php file is executed opcache checks the last time it was modified on disk
+  - then compares this time with the last time it cached the compilation of the script.
+  - If the file was modified after being cached, compile cache for the script 
+  - will be generated.
+  - Not necessary on production server as it will use unneeded cpu cycles.
+  - dev server 
+    - opcache.validate_timestamps=1
+    - opcache.revalidate_freq=2
+  - prod server
+      - opcache.validate_timestamps=0
+      - opcache.revalidate_freq=2
+  - clearing opcache
+    - cli
+    - restart php-fpm
+    - wp dashboard
+    - plugin
+    - w3tc
+
 ```
 cd /etc/php/8.1/fpm
 ll
 sudo cp php.ini php.ini.bak
 sudo vi php.ini
-```
 
+cd /etc/php/8.1/fpm
+sudo vi php.ini
+Search for allow_url_f
+Search for cgi.fax_p
+Search for expose_p
+
+upload_max_filesize = 100M
+post_max_size = 125M
+max_execution_time = 30
+max_input_time = 60
+max_input_vars = 3000
+memory_limit = 256M
+
+Important to remember to also set the value in your wp-config.php file
+opcache.enable=1
+
+OPCACHE CONFIGURATION: DEVELOPMENT SERVER
+opcache.memory_consumption=192
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=7963
+opcache.validate_timestamps=1
+
+OPCACHE CONFIGURATION: PRODUCTION SERVER
+opcache.memory_consumption=192
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=7963
+opcache.revalidate_freq=2
+; Development Server
+opcache.validate_timestamps=1
+; Production Server
+;opcache.validate_timestamps=0
+opcache.revalidate_freq=2
+```
+- "too many open files"
+    - reached limit of many files
+    - that process can have open
+    - Procedure:
+        - check current limit
+        - increase limit
+        - confirm new limit
+```
+cd /var/www
+find . -type f -print | grep php | wc -l
+
+Determine the nginx process ID:
+ps aux | grep php-fpm
+
+View the open file limits using the cat command:
+cat /proc/<pid>/limits
+
+Open php-fpm.conf using nano:
+cd /etc/php/8.1/fpm/
+sudo cp php-fpm.conf php-fpm.conf.bak
+sudo vi /etc/php/8.1/fpm/php-fpm.conf
+
+Search for rlimit_files
+rlimit_files = 32768
+rlimit_core = unlimited 
+
+Restart nginx and php-fpm
+sudo systemctl reload nginx
+sudo systemctl restart php8.1-fpm
+
+Verify New Open File Limits: PHP-FPM
+ps aux | grep php-fpm
+cat /proc/<pid>/limits
+```
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
