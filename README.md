@@ -654,6 +654,209 @@ alias ngsa='cd /etc/nginx/sites-available/ && ls'
 alias ngin='cd /etc/nginx/includes/ && ls'
 su <user>
 ```
+
+## Harden and optimize MariaDB
+```
+cd
+sudo mysql_secure_installation
+Enter current password for root (enter for none): [Enter]
+Switch to unix_socket authentication [Y/n] n
+Change the root password? [Y/n] n
+Remove anonymous users? [Y/n] y
+Disallow root login remotely? [Y/n] y
+Remove test database and access to it? [Y/n] y
+Reload privilege tables now? [Y/n] y
+
+sudo mysql
+sudo mysql -uroot
+
+Confirm the swappiness value:
+sudo sysctl -a | grep swappiness
+Increase to 5:
+sudo sysctl -w vm.swappiness=5
+
+show databases;
+show schema;
+
+cd /etc/mysql/mariadb.conf.d/
+sudo cp 50-server.cnf 50-server.cnf.bak
+sudo vi 50-server.cnf
+
+Put this:
+# Performance Schema
+performance_schema=ON
+performance-schema-instrument='stage/%=ON'
+performance-schema-consumer-events-stages-current=ON
+performance-schema-consumer-events-stages-history=ON
+performance-schema-consumer-events-stages-history-long=ON
+```
+
+- Mysql query cache - Stores the results of a query
+  - caching is good except in this case, takes longer to return 
+  - a result from the cache faster to query the dataset directory
+  - ensure query cache is disabled.
+```
+sudo mysql
+show variables like 'have_query_cache';
+show variables like 'query_cache_%';
+
+alias supd='sudo apt update && sudo apt upgrade && sudo apt autoremove'
+alias ngt='sudo nginx -t'
+alias ngr='sudo systemctl reload nginx'
+alias fpmr='sudo systemctl restart php8.1-fpm'
+alias ngsa='cd /etc/nginx/sites-available/ && ls'
+alias ngin='cd /etc/nginx/includes/ && ls'
+alias mdbrs='sudo systemctl restart mariadb'
+alias sumys='sudo mysql'
+```
+
+- Mysql dns lookups - new client connection 
+  - thread created to handle the request
+  - checks if clients hostname is in the host cache
+  - if not, thread resolves ip to a hostname
+  - then resolves it back to an ip 
+  - this is time-consuming, dns lookups must be disabled
+```
+sudo vi 50-server.cnf
+Put this to disable dns lookups:
+Uncomment
+#skip-name-resolve
+skip-name-resolve
+```
+
+- Mariadb log files - size and space used by log files
+  - size and space used by log files
+  - can become a problem on small servers
+  - server may run out of disk space
+  - results in mariadb becoming "non-responsive"
+  - reduce the number of log files
+  - from 10(default) to 3 days
+```
+show variables like 'expire_logs_days';
+SET GLOBAL expire_logs_days = 3;
+flush binary logs;
+
+sudo vi 50-server.cnf
+Put this to set expire log files limit:
+expire_logs_days = 3
+
+mdbrs
+
+show variables like 'expire_logs_days';
+```
+
+-- Innodb 
+    - innodb buffer pool size
+        - amount of memory allocated to the innodb buffer pool 
+        - used to cache data and index blocks.
+        - one of the most important settings
+        - set to 80% of server RAM
+    - innodb log file size
+        - transaction or commit log
+        - set to 25% of the innodb_buffer_pool_size
+    - innodb resource allocation
+        - innodb_buffer_pool_size -> 80% of total server memory
+        - innodb_log_file_size -> 25% of the innodb_buffer_pool_size
+        - monitor resources using htop
+        - do not modify the innodb_log_file_size then restart mdb, innodb may be corrupted
+            Procedure:
+            - check log file size
+            - stop mariadb
+            - set innodb_log_file_size
+            - start mariadb
+            - check and confirm new log file size
+```
+htop
+sumys
+
+sudo vi 50-server.cnf
+# InnoDB
+innodb_buffer_pool_size = 800M
+#innodb_log_file_size = 200M
+sudo systemctl stop mariadb
+
+sudo vi 50-server.cnf
+# InnoDB
+innodb_buffer_pool_size = 800M
+innodb_log_file_size = 200M
+sudo systemctl start mariadb
+
+SHOW VARIABLES LIKE '%innodb_buffer%';
+SHOW VARIABLES LIKE '%innodb_log%';
+```
+
+- Mysql tuner
+  - Perl script that analyzes your mysql configuration and performance.
+  - Makes recommendations which variables you should adjust in order to increase
+  - performance and decrease resource usage.
+  - run every 60 to 90 days, don't run continuously
+  - task
+```
+cd 
+mkdir MySQLTuner/
+cd MySQLTuner/
+wget http://mysqltuner.pl/ -O mysqltuner.pl
+chmod +x mysqltuner.pl
+run it:
+sudo ./mysqltuner.pl
+```
+
+- Database optimization
+  - Performed over a period of time
+  - Higher is not always better
+  - Use a conservative approach
+  - No quick fixes
+  - Reduce resource usage
+  - Optimum performance
+![mariadb.png](diagrams%2Fmariadb.png)
+
+- "too many open files"
+    - reached limit of many files
+    - that process can have open
+    - Procedure:
+        - check current limit
+        - increase limit
+        - confirm new limit
+```
+get pid:
+ps aux | grep mysql
+View the open file limits:
+cat /proc/<pid>/limits
+
+cd /etc/systemd/system/
+ll
+If not exist create this dir:
+sudo mkdir mariadb.service.d/
+
+cd mariadb.service.d/
+touch limits.conf
+Put this:
+[Service]
+LimitNOFILE=40000
+
+sudo systemctl daemon-reload
+sudo systemctl restart mariadb
+Verify:
+ps aux | grep mysql
+cat /proc/<pid>/limits
+```
+
+
+## Harden and optimize PHP81
+- php 8.1 eol 25-10-24
+- ubuntu/ondrej php 8.1 release supported until april 2027
+- 50% faster than 7.4 and 8.0
+- harden - remove dangerous settings
+  - allow_url_fopen
+  - cgi.fix_pathinfo
+  - expose_php
+```
+cd /etc/php/8.1/fpm
+ll
+sudo cp php.ini php.ini.bak
+sudo vi php.ini
+```
+
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
