@@ -1275,13 +1275,477 @@ https://www.ssllabs.com/ssltest/
   - settings|General
   - Change wp address (url) and the site address from http to https
   
-    
+- certbot commands
+```
+sudo certbot certificates
+sudo certbot delete
+sudo certbot renew
+sudo certbot renew --dry-run
+sudo certbot renew --force-renewal
 
+sudo crontab -e
+# m h dom mon dow   command
+00 1 14,28 * * certbot renew --force-renewal
+00 2 14,28 * * systemctl reload nginx
+```
+- cron maintenance
+  - cron attempts to send mail to
+  - the user who initiated the cron
+  - no root server user & the root user
+  - recommend you disable this behaviour
+```
+disable sending mail:
+add >/dev/null 2>&1
+to the end of the cron job
+```
 - http response headers
+  - http headers are the core part of http requests ans responses
+  - general headers
+  - request headers
+  - response headers
+  - entity headers
+```
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers
+```
+- http response headers
+    - X-Frame-Options      
+    - X-Content-Type-Options      
+    - X-XSS-Options      
+    - Referrer-Policy     
+    - Permissions(feature)-Policy     
+    - Content-Security-Policy  
+- http response headers
+  - create an include file
+  - add the directives to the include file
+  - include the file in your sites
+  - server block conf file
+```
+cd /etc/nginx/includes/
+sudo vi http_headers.conf
+# -------------------------------------------------------
+
+# Add Header Referrer-Policy - Uncomment desired directive
+
+# -------------------------------------------------------
+
+#add_header Referrer-Policy "no-referrer";
+#add_header Referrer-Policy "no-referrer-when-downgrade";
+#add_header Referrer-Policy "origin";
+#add_header Referrer-Policy "origin-when-cross-origin";
+#add_header Referrer-Policy "same-origin";
+#add_header Referrer-Policy "strict-origin";
+add_header Referrer-Policy "strict-origin-when-cross-origin";
+#add_header Referrer-Policy "unsafe-url";
+# ------------------------------------------------------
+add_header X-Content-Type-Options "nosniff";
+add_header X-Frame-Options "sameorigin";
+add_header X-XSS-Protection "1; mode=block";
+add_header Permissions-Policy "geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=self,payment=()";
+# Keep CSP Commented until site setup is done, then complete the CSP lecture.
+#add_header Content-Security-Policy "default-src 'self'; script-src 'self'; object-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; frame-src 'self'; font-src 'self'; connect-src 'self'; frame-ancestors 'self';"
+
+
+cd /etc/nginx/sites-available/
+sudo vi example.com.conf
+# Place ABOVE the php processing location block
+include /etc/nginx/includes/http_headers.conf;
+
+sudo nginx -t
+sudo systemctl reload nginx
+curl -I http://pristinehost.uk
+curl -I http://www.pristinehost.uk
+
+test on: securityheaders.com
+Fix Content Security Policy when site is completed.
+```
 - ownership and permissions
-- nginx directives
+  - secure wp using cli
+  - use best practices when setting the ownership and permissions
+  - wp codex
+- ownership
+  - 2 possible ownership schemes
+  - www-data:www-data
+  - $USER:www-data
+- www-data:www-data
+  - nginx is the owner and the group owner of the wp dir and files
+  - issue free wp site admin
+    - not the most secure scheme
+    - principle of least privilege
+    - permissions
+    - dir 755 | files 644 | wp-config 400
+      - not recommended for security purposes
+    - some themes and plugins doesn't work correctly unless it's set to www-data:www-data
+```
+WWW-DATA:WWW-DATA
+cd /var/www/example.com/
+sudo chown -R www-data:www-data public_html/
+sudo find /var/www/example.com/public_html/ -type d -exec chmod 755 {} \;
+sudo find /var/www/example.com/public_html/ -type f -exec chmod 644 {} \;
+```
+- $USER:www-data
+  - your non-root user is owner and www-data is the group user of wp dir and files
+  - more secure env
+  - restrict web server's write permissions
+  - principle of least privilege
+  - permissions
+    - dir 755 | files 644 | wp-config 664 to 644
+    - dir 775 files 664
+  - more secure than www-data:www-data
+  - few issues
+  - client can't be independent
+- who is going to administer the site?
+- access to command line
+- be able to change permissions
+- client want issue free sites
+```
+$USER:WWW-DATA
+cd /var/www/example.com/
+sudo chown -R $USER:www-data public_html/
+sudo find /var/www/example.com/public_html/ -type d -exec chmod 755 {} \;
+sudo find /var/www/example.com/public_html/ -type f -exec chmod 644 {} \;
+sudo find /var/www/example.com/public_html/wp-content/ -type d -exec chmod 775 {} \;
+sudo find /var/www/example.com/public_html/wp-content/ -type f -exec chmod 664 {} \;
+sudo chmod 400 wp-config.php
+```
+
+Relax Permissions prior to any core update:
+```
+cd /var/www/example.com/
+sudo chown -R www-data:www-data public_html/
+sudo find /var/www/site.com/public_html/ -type d -exec chmod 775 {} \;
+sudo find /var/www/site.com/public_html/ -type f -exec chmod 664 {} \;
+```
+
+Harden Permissions after any core update:
+```
+cd /var/www/example.com/
+sudo chown -R $USER:www-data public_html/
+sudo find /var/www/example.com/public_html/ -type d -exec chmod 755 {} \;
+sudo find /var/www/example.com/public_html/ -type f -exec chmod 644 {} \;
+sudo find /var/www/example.com/public_html/wp-content/ -type d -exec chmod 775 {} \;
+sudo find /var/www/example.com/public_html/wp-content/ -type f -exec chmod 664 {} \;
+```
+
+```
+cd
+cd bash_scripts/
+vi ownership_permissions.sh
+SCRIPT:
+
+#!/bin/bash
+echo "What is your domain name?"
+read domain
+echo "What is your non root server username?"
+read nonroot
+
+echo Changing Ownership and Permissions
+sudo chown -R $nonroot:www-data /var/www/$domain/public_html/
+sudo find /var/www/$domain/public_html/ -type d -exec chmod 775 {} \;
+sudo find /var/www/$domain/public_html/ -type f -exec chmod 664 {} \;
+
+# Restart the php-fpm process to clear the opcache
+sudo systemctl restart php8.1-fpm
+echo Please open the WP DASHBOARD and UPDATE WP and switch back to terminal AFTER COMPLETING the WP update
+echo ------------------------------------------------------------
+read -p "Finished Updating WordPress? Press ENTER to continue" y
+echo ------------------------------------------------------------
+sudo chown -R $nonroot:www-data /var/www/$domain/public_html/
+sudo find /var/www/$domain/public_html/ -type d -exec chmod 755 {} \;
+sudo find /var/www/$domain/public_html/ -type f -exec chmod 644 {} \;
+sudo find /var/www/$domain/public_html/wp-content/ -type d -exec chmod 775 {} \;
+sudo find /var/www/$domain/public_html/wp-content/ -type f -exec chmod 664 {} \;
+# Restart the php-fpm process to clear the opcache
+sudo systemctl restart php8.1-fpm
+echo Changing Ownership and Permissions
+echo DONE…
+
+
+Set Permissions
+chmod +x ownership_permissions.sh
+To Run:
+sudo ./ownership_permissions.sh
+
+For installing plugins that need to create files in the root of wp files, give public_html 755
+sudo chmod 755 public_html/
+```
+
+- harden wp using nginx directives
+  - use nginx to block access to important wp files and dirs
+  - block bad bots
+  - bloch php execution
+  - filter request methods and url query strings
+  - block sql injection, common exploits
+  - spam and certain user agents
+  - easy to implement
+  - directives used in an include file
+```
+cd /etc/nginx/includes
+sudo vi wp_nginx_security_directives.conf
+# Deny Access To Important WP Files
+location = /wp-config.php { deny all; }
+location = /wp-admin/install.php { deny all; }
+location ~* /readme\.html$ { deny all; }
+location ~* /readme\.txt$ { deny all; }
+location ~* /licence\.txt$ { deny all; }
+location ~* /license\.txt$ { deny all; }
+location ~ ^/wp-admin/includes/ { deny all; }
+location ~ ^/wp-includes/[^/]+\.php$ { deny all; }
+location ~ ^/wp-includes/js/tinymce/langs/.+\.php$ { deny all; }
+location ~ ^/wp-includes/theme-compat/ { deny all; }
+
+# Disable PHP in Uploads, Plugins and Theme Directories
+location ~* ^/wp\-content/uploads/.*\.(?:php[1-7]?|pht|phtml?|phps)$ { deny all; }
+location ~* ^/wp\-content/plugins/.*\.(?:php[1-7]?|pht|phtml?|phps)$ { deny all; }
+location ~* ^/wp\-content/themes/.*\.(?:php[1-7]?|pht|phtml?|phps)$ { deny all; }
+
+# Filter Request Methods
+if ( $request_method ~* ^(TRACE|DELETE|TRACK)$ ) { return 403; }
+
+# Filter Suspicious Query Strings in the URL
+set $susquery 0;
+if ( $args ~* "\.\./" ) { set $susquery 1; }
+if ( $args ~* "\.(bash|git|hg|log|svn|swp|cvs)" ) { set $susquery 1; }
+if ( $args ~* "etc/passwd" ) { set $susquery 1; }
+if ( $args ~* "boot\.ini" ) { set $susquery 1; }
+if ( $args ~* "ftp:" ) { set $susquery 1; }
+if ( $args ~* "(<|%3C)script(>|%3E)" ) { set $susquery 1; }
+if ( $args ~* "mosConfig_[a-zA-Z_]{1,21}(=|%3D)" ) { set $susquery 1; }
+if ( $args ~* "base64_decode\(" ) { set $susquery 1; }
+if ( $args ~* "%24&x" ) { set $susquery 1; }
+if ( $args ~* "127\.0" ) { set $susquery 1; }
+if ( $args ~* "(globals|encode|loopback|request|insert|concat|union|declare)" ) { set $susquery 1; }
+if ( $args ~* "(request|localhost)" ) { set $susquery 1; }
+if ( $args ~* "%[01][0-9A-F]" ) { set $susquery 1; }
+if ( $args ~ "^loggedout=true" ) { set $susquery 0; }
+if ( $args ~ "^action=jetpack-sso" ) { set $susquery 0; }
+if ( $args ~ "^action=rp" ) { set $susquery 0; }
+if ( $http_cookie ~ "wordpress_logged_in_" ) { set $susquery 0; }
+if ( $http_referer ~* "^https?://maps\.googleapis\.com/" ) { set $susquery 0; }
+if ( $susquery = 1 ) { return 403; }
+
+# BLOCK COMMON SQL INJECTIONS
+set $block_sql_injections 0;
+if ($query_string ~ "union.*select.*\(") { set $block_sql_injections 1; }
+if ($query_string ~ "union.*all.*select.*") { set $block_sql_injections 1; }
+if ($query_string ~ "concat.*\(") { set $block_sql_injections 1; }
+if ($block_sql_injections = 1) { return 403; }
+
+# BLOCK FILE INJECTIONS
+set $block_file_injections 0;
+if ($query_string ~ "[a-zA-Z0-9_]=http://") { set $block_file_injections 1; }
+if ($query_string ~ "[a-zA-Z0-9_]=(\.\.//?)+") { set $block_file_injections 1; }
+if ($query_string ~ "[a-zA-Z0-9_]=/([a-z0-9_.]//?)+") { set $block_file_injections 1; }
+if ($block_file_injections = 1) { return 403; }
+
+# BLOCK COMMON EXPLOITS
+set $block_common_exploits 0;
+if ($query_string ~ "(<|%3C).*script.*(>|%3E)") { set $block_common_exploits 1; }
+if ($query_string ~ "GLOBALS(=|\[|\%[0-9A-Z]{0,2})") { set $block_common_exploits 1; }
+if ($query_string ~ "_REQUEST(=|\[|\%[0-9A-Z]{0,2})") { set $block_common_exploits 1; }
+if ($query_string ~ "proc/self/environ") { set $block_common_exploits 1; }
+if ($query_string ~ "mosConfig_[a-zA-Z_]{1,21}(=|\%3D)") { set $block_common_exploits 1; }
+if ($query_string ~ "base64_(en|de)code\(.*\)") { set $block_common_exploits 1; }
+if ($block_common_exploits = 1) { return 403; }
+
+# BLOCK SPAM
+set $block_spam 0;
+if ($query_string ~ "\b(ultram|unicauca|valium|viagra|vicodin|xanax|ypxaieo)\b") { set $block_spam 1; }
+if ($query_string ~ "\b(erections|hoodia|huronriveracres|impotence|levitra|libido)\b") { set $block_spam 1; }
+if ($query_string ~ "\b(ambien|blue\spill|cialis|cocaine|ejaculation|erectile)\b") { set $block_spam 1; }
+if ($query_string ~ "\b(lipitor|phentermin|pro[sz]ac|sandyauer|tramadol|troyhamby)\b") { set $block_spam 1; }
+if ($block_spam = 1) { return 403; }
+
+# BLOCK USER AGENTS
+set $block_user_agents 0;
+if ($http_user_agent ~ "Indy Library") { set $block_user_agents 1; }
+if ($http_user_agent ~ "libwww-perl") { set $block_user_agents 1; }
+if ($http_user_agent ~ "GetRight") { set $block_user_agents 1; }
+if ($http_user_agent ~ "GetWeb!") { set $block_user_agents 1; }
+if ($http_user_agent ~ "Go!Zilla") { set $block_user_agents 1; }
+if ($http_user_agent ~ "Download Demon") { set $block_user_agents 1; }
+if ($http_user_agent ~ "Go-Ahead-Got-It") { set $block_user_agents 1; }
+if ($http_user_agent ~ "TurnitinBot") { set $block_user_agents 1; }
+if ($http_user_agent ~ "GrabNet") { set $block_user_agents 1; }
+if ($http_user_agent ~ "dirbuster") { set $block_user_agents 1; }
+if ($http_user_agent ~ "nikto") { set $block_user_agents 1; }
+if ($http_user_agent ~ "SF") { set $block_user_agents 1; }
+if ($http_user_agent ~ "sqlmap") { set $block_user_agents 1; }
+if ($http_user_agent ~ "fimap") { set $block_user_agents 1; }
+if ($http_user_agent ~ "nessus") { set $block_user_agents 1; }
+if ($http_user_agent ~ "whatweb") { set $block_user_agents 1; }
+if ($http_user_agent ~ "Openvas") { set $block_user_agents 1; }
+if ($http_user_agent ~ "jbrofuzz") { set $block_user_agents 1; }
+if ($http_user_agent ~ "libwhisker") { set $block_user_agents 1; }
+if ($http_user_agent ~ "webshag") { set $block_user_agents 1; }
+if ($http_user_agent ~ "Acunetix-Product") { set $block_user_agents 1; }
+if ($http_user_agent ~ "Acunetix") { set $block_user_agents 1; }
+if ($block_user_agents = 1) { return 403; }
+
+cd /etc/nginx/sites-available/
+sudo vi example.com
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+- stop brute force attack using nginx
+- rate limiting
+  - xmlrpc.php
+  - wp-login.php
+  - rate limiting exceeded
+  - return a http 444 code
+  - 444 nginx only response code
+  - means the server will return no response
+```
+cd /etc/nginx/
+sudo nano nginx.conf
+##
+# Rate Limiting
+##
+limit_req_zone $binary_remote_addr zone=wp:10m rate=30r/m;
+cd /etc/nginx/includes/
+sudo nano rate_limiting.conf
+
+Contents:
+location = /wp-login.php {
+limit_req zone=wp nodelay;
+limit_req_status 444;
+include snippets/fastcgi-php.conf;
+fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+include /etc/nginx/includes/fastcgi_optimize.conf;
+}
+
+location = /xmlrpc.php {
+limit_req zone=wp nodelay;
+limit_req_status 444;
+include snippets/fastcgi-php.conf;
+fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+include /etc/nginx/includes/fastcgi_optimize.conf;
+}
+
+# Rate Limiting Include
+include /etc/nginx/includes/rate_limiting.conf;
+
+Test configuration and then reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
+
+NGINX DDOS RATE LIMITING
+cd /etc/nginx/
+sudo nano nginx.conf
+##
+# Rate Limiting & Limit Requests
+##
+limit_req_zone $binary_remote_addr zone=wp:10m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=ip_address:10m rate=100r/s;
+limit_req zone=ip_address nodelay;
+
+cd /etc/fail2ban
+sudo nano jail.local
+
+Modify:
+[nginx-limit-req]
+port    = http,https
+logpath = /var/log/nginx/error*.log
+maxretry = 10
+enabled = true
+
+To enable, restart the f2b service.
+sudo systemctl restart fail2ban
+
+Test configuration and then reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
+
+Test rate limitinng:
+wpscan --url https://<your_domain>/ --passwords passwords.txt
+look at the logs
+```
+
 - hot linking protection
+  - images being hot linked?
+  - stealing your bandwidth
+  - monthly server cost increases
+  - cloudflare hotlinking protection
+  - nginx hotlinking protection
+- Cloudflare hotlinking protection
+  - easy to configure
+  - one-click and it's done
+  - only implement after setting up
+  - cloudflare as per the course
+  - enable Scrap Shield > Hotlink Protection on your domain in cloudflare
+- Nginx hotlinking protection
+  - will not work when cloudflare is enabled
+  - offers more config options at the expense of possible config issues
+  - can be a slightly complex setup
+  - will result in more server resource demands because cloudflare is disabled
+Nginx DDOS Protection
+    - ddos protection
+      - stop small ddos attacks
+      - needs to be stopped at ahigher level
+      - enable cloudlflare or contact your host
+      - enable the nginx-limit-req fail2ban jail
+    - limit incoming requests to a value of real users
+    - customizes to your sites requirements
+    - limit the number of connections per single ip
+```
+NGINX DDOS RATE LIMITING
+cd /etc/nginx/
+sudo nano nginx.conf
+##
+# Rate Limiting & Limit Requests
+##
+limit_req_zone $binary_remote_addr zone=wp:10m rate=30r/m;
+limit_req_zone $binary_remote_addr zone=ip_address:10m rate=100r/s;
+
+
+cd sites-available/
+sudo vi pristinehost.uk.conf
+limit_req zone=ip_address nodelay;
+```
+- fail2ban nginx-limit-req jail
+  - it can break the site
+```
+cd /etc/fail2ban
+sudo vi jail.local
+
+Modify:
+[nginx-limit-req]
+port    = http,https
+logpath = /var/log/nginx/error*.log
+maxretry = 10
+enabled = true
+
+To enable, restart the f2b service.
+sudo systemctl restart fail2ban
+
+Test configuration and then reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
+```
+nginx limit_req directive
+- not recommended to enable "site" wide
+- can interfere with site functionality
+- can lead to breaking the site
+- can ban legitimate site users
+- enable only for xmlrpc and wp-login protection
+
 - web app firewall
+  - waf will intercept requests and either
+  - allow or deny the request
+  - based on rules
+  - best wp waf is Ninja firewall
+  - easy to set up
+  - https://wordpress.org/plugins/ninjafirewall/
+```
+cd /var/www/<your_domain>
+sudo chmod 775 public_html
+install ninja firewall plugin
+sudo ./ownership_permissions.sh
+after installation and settings
+press enter
+```
+
+### Optimizing WP
 
 
 ## Support
