@@ -1100,6 +1100,151 @@ sudo ln -s /etc/nginx/sites-available/pristinehost.uk.conf /etc/nginx/sites-enab
 removing suymlink;
 rm symlink_name
 ```
+
+### Install WP
+```
+sudo mysql
+create database <your_db_name>;
+grant all privileges on <your_db_name>.* to '<db_username>'@'localhost' identified by 'password';
+REFRESH / ENABLE CHANGES
+flush privileges;
+VIEW PRIVILEGES
+show grants for '<db_username>'@'localhost';
+select host, user from mysql.user;
+show databases;
+use db_name;
+show tables;
+describe table_name;
+drop user '<username>'@'localhost'
+
+Generate random databse username and password:
+cat /dev/urandom | tr -dc 'a-za-z0-9' | fold -w 10 | head -n 2
+
+sudo mysql
+create database db_name;
+grant all privileges on <your_db_name>.* to '<db_username>'@'localhost' identified by 'password';
+cat /dev/urandom | tr -dc 'a-za-z0-9' | fold -w 30 | head -n 2
+```
+- Install wp
+  - wp config details
+  - wp salts
+  - table-prefix
+  - allow direct updating of plugins and themes
+  - disable the built-in plugin and theme editor
+  - set wp memory limit
+  - turn off automatic core updates
+```
+tree /var/www
+
+cd
+wget https://wordpress.org/latest.tar.gz
+extract gzip:
+tar xf latest.tar.gz
+sudo rm latest.tar.gz
+ls
+
+cd wordpress/
+mv wp-config-sample.php wp-config.php
+
+/** Allow Direct Updating Without FTP */
+define('FS_METHOD', 'direct');
+/** Disable Editing of Themes and Plugins Using the Built In Editor */
+define('DISALLOW_FILE_EDIT', 'true');
+/** Increase WordPress Memory Limit */
+define('WP_MEMORY_LIMIT', '256M');
+/** TURN OFF AUTOMATIC UPDATES */
+define('WP_AUTO_UPDATE_CORE', false );
+
+Generat wp salt:
+Browser: https://api.wordpress.org/secret-key/1.1/salt/
+Terminal: curl -s https://api.wordpress.org/secret-key/1.1/salt/
+```
+- with or without www
+```
+cd
+cd wordpress/
+sudo mv * /var/www/example.com/public_html/
+cd /var/www/example.com
+sudo chown -R www-data:www-data public_html/
+ls -l
+```
+Set permalinks
+- set to postname
+
+### Harden WP
+- ssl cert
+```
+curl -I http://pristinehost.uk
+check CNAME record;
+curl -I http://www.pristinehost.uk
+sudo apt install certbot
+
+Tweak the config for optimal performance and security:
+sudo certbot certonly --webroot -w /<path> -d example.com -d www.example.com
+sudo certbot certonly --webroot -w /var/www/example.com/public_html/ -d example.com -d www.example.com
+```
+- nginx ssl config
+  - create a diffie hellman params file
+  - create a site specific include file
+  - create a general ssl include file
+  - create a secure nginx server block
+- Diffie Hellman Params
+  - generate a file dhparam.pem
+  - an algorithm used to establish
+  - a shared secret between two parties
+  - method of exchanging cryptography keys
+  - for use in symmetric encryption algorithms
+  - define how openSSL performs the Diffie-Hellman key-exchange.
+- site specific ssl conf file
+  - site specific include file contains the absolute pth/location of the various cert files
+  - this file is unique to each site
+- general ssl config file for all sites
+    - ssl conf file for all sites
+    - this file contains the ssl directives that can be used by all our sites on the server
+    - no need to recreate this file for ewach site
+    - include the file in your sites nginx conf file for each additional site.
+```
+cd /etc/nginx/
+sudo mkdir ssl/
+cd ssl/
+sudo openssl dhparam -out dhparam.pem 2048
+ls
+sudo vi /etc/nginx/ssl/ssl_example.com.conf
+
+ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+# SSL STAPLING
+ssl_trusted_certificate /etc/letsencrypt/live/example.com/chain.pem;
+
+sudo vi /etc/nginx/ssl/ssl_all_sites.conf
+# CONFIGURATION RESULTS IN A+ RATING AT SSLLABS.COM
+# WILL UPDATE DIRECTIIVES TO MAINTAIN A+ RATING - CHECK DATE
+# DATE: NOVEMBER 2022
+ssl_session_cache shared:SSL:20m;
+ssl_session_timeout 180m;
+ssl_protocols TLSv1.2 TLSv1.3;
+ssl_prefer_server_ciphers on;
+# ssl_ciphers must be on a single line, do not split over multiple lines
+ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+ssl_dhparam /etc/nginx/ssl/dhparam.pem;
+ssl_stapling on;
+ssl_stapling_verify on;
+# resolver set to Cloudflare
+# timeout can be set up to 30s
+resolver 1.1.1.1 1.0.0.1;
+resolver_timeout 15s;
+ssl_session_tickets off;
+add_header Strict-Transport-Security "max-age=31536000;" always;
+# After settting up ALL of your sub domains - comment the above and uncomment the directive hereunder, then reload nginx
+# add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; " always;
+```
+- http response headers
+- ownership and permissions
+- nginx directives
+- hot linking protection
+- web app firewall
+
+
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
