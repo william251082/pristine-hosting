@@ -1023,7 +1023,82 @@ Create a server block
 - install site
 ```
 cd /etc/nginx/sites-available
+sudo vi default
+sudo vi pristinehost.uk.conf
+server {
+    listen 80
+    listen [::]:80;
+    server_name example.com www.example.com;   
+    root /var/www/example.com/public_html;   
+    index index.php;
+    location / {
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;  // sets the directive that can be used to set the fastcgim params to values specific to the request
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock; // specifies the socket we want to use
+        include /etc/nginx/includes/fastcgi_optimize.conf;
+    }
+    include /etc/nginx/includes/browser_caching.conf;
+    access_log /var/log/nginx/access_example.com.log combined buffer=256k flush=60m; // each site must have its own log files
+    error_log /var/log/nginx/error_example.com.log;
+}
+cd /etc/nginx/includes
+sudo touch browser_caching.conf
+```
 
+- Browser Caching Conf
+  - define when and where th caching occurs
+```
+location ~* \.(webp|3gp|gif|jpg|jpeg|png|ico|wmv|avi|asf|asx|mpg|mpeg|mp4|pls|mp3|mid|wav|swf|flv|exe|zip|tar|rar|gz|tgz|bz2|uha|7z|doc|docx|xls|xlsx|pdf|iso)$ {
+    add_header Cache-Control "public, no-transform";
+    access_log off;
+    expires 365d;
+}
+
+location ~* \.(js)$ {
+    add_header Cache-Control "public, no-transform";
+    access_log off;
+    expires 30d;
+}
+
+location ~* \.(css)$ {
+    add_header Cache-Control "public, no-transform";
+    access_log off;
+    expires 30d;
+}
+
+location ~* \.(eot|svg|ttf|woff|woff2)$ {
+    add_header Cache-Control "public, no-transform";
+    access_log off;
+    expires 30d;
+}
+```
+- FastCGI optimization
+```
+cd /etc/nginx/includes/
+
+sudo touch fastcgi_optimize.conf
+sudo vi fastcgi_optimize.conf
+fastcgi_connect_timeout 60;
+fastcgi_send_timeout 180;
+fastcgi_read_timeout 180;
+fastcgi_buffer_size 512k;
+fastcgi_buffers 512 16k;
+fastcgi_busy_buffers_size 1m;
+fastcgi_temp_file_write_size 4m;
+fastcgi_max_temp_file_size 4m;
+fastcgi_intercept_errors on;
+
+Include on you sites server block conf: 
+sudo vi <your_domain>.conf
+include /etc/nginx/includes/fastcgi_optimize.conf;
+
+Enable the server block:
+ls sites-*
+sudo ln -s /etc/nginx/sites-available/pristinehost.uk.conf /etc/nginx/sites-enabled/
+removing suymlink;
+rm symlink_name
 ```
 ## Support
 
