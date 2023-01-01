@@ -646,7 +646,7 @@ sudo systemctl reload nginx
 ```
 cd
 nano .bash_aliases
-alias server_update='sudo apt update && sudo apt upgrade && sudo apt autoremove'
+alias supd='sudo apt update && sudo apt upgrade && sudo apt autoremove'
 alias ngt='sudo nginx -t'
 alias ngr='sudo systemctl reload nginx'
 alias fpmr='sudo systemctl restart php8.1-fpm'
@@ -952,6 +952,57 @@ Verify New Open File Limits: PHP-FPM
 ps aux | grep php-fpm
 cat /proc/<pid>/limits
 ```
+
+### Server and site file dir structure
+- web and doc root
+  - default web root - /var/www/
+  - doc root - /var/www/<your_domain_name>.com/public_html/
+```
+sudo apt update && sudo apt install tree
+cd /var/www/
+sudo mkdir <your_domain_name>.com/
+rename dir:
+sudo mv examle.net example.com
+remove dir
+rm -rf
+
+Create bash script for multiple sites:
+sudo mkdir bash_scripts
+touch create_dirs.sh
+#!/bin/bash
+echo "what is your domain name?"
+read domain
+mkdir -p /var/www/$domain/public_html/
+echo "Your site directories have been created"
+ls -ld /var/www/$domain/public_html/
+
+sudo chmod +x create_dirs.sh
+sudo ./create_dirs.sh
+```
+
+### NGINX Server blocks
+- Used to host and serve multiple sites. Server host in apache.
+- Create seerver block in a file
+```
+/etc/nginx/sites-available
+Create symlink for the server block from sites-available to the sites-enables dir
+```
+- create a server block file in sites-available
+- create a symlink to the server block file in sites-enabled
+- sites-enabled should reference the server block file in the sites-available dir
+```
+sites-available is included in /etc/nginx/nginc.conf
+├── sites-available
+│   └── default
+├── sites-enabled
+│   └── default -> /etc/nginx/sites-available/default
+```
+- Server block config
+    after creating a server block and symlink to /etc/nginx/sites-enabled
+  - test the nginx config
+  - reload nginx to enable the server block
+  - difference between reload and restart
+  - must use reload
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
