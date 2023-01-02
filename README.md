@@ -2008,17 +2008,53 @@ sudo systemctl reload nginx
 curl -I https://example.com
 curl -I https://www.example.com
 
+Install nginx helper plugin
+cd /var/www/example.com/public_html
+sudo chmod 664 wp-config
+cd
+sudo ./ownership_permissions.sh
+sudo vi /var/www/pristinehost.uk/public_html/wp-config.php
 define('RT_WP_NGINX_HELPER_CACHE_PATH','/var/run/PATH/');
-Close nano, saving the changes, then restart the php-fpm process
+
+Close vi, saving the changes, then restart the php-fpm process
 sudo systemctl restart php8.1-fpm
 
 Under the index directive add the location block that will allow for selective purging of the cache:
+index index.php;
 location ~ /purge(/.*) {
     fastcgi_cache_purge NAME "$scheme$request_method$host$1";
 }
 sudo nginx -t
 sudo systemctl reload nginx
 
+cd /var/log/nginx
+sudo cat error_<your_domain>.log 
+
+cd /etc/nginx
+sudo vi nginx.conf
+comment out:
+#limit_req_zone $binary_remote_addr zone=ip_address:10m rate=100r/s;
+
+cd /etc/nginx/sites-available
+sudo vi <your_domain>.conf
+comment out:
+#limit_req zone=ip_address nodelay;
+
+cd /etc/fail2ban
+sudo vi jail.conf
+
+Modify:
+[nginx-limit-req]
+port    = http,https
+logpath = /var/log/nginx/error*.log
+maxretry = 10
+enabled = false
+
+To enable, restart the f2b service.
+sudo systemctl restart fail2ban
+
+
+Comment out all fastcgi nginx changes in nginx.conf, wp-config.php and <your_domain>.conf
 # W3TC
 cd /var/www/example.com/public_html/
 sudo touch nginx.conf
