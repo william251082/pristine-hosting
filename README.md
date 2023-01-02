@@ -1812,11 +1812,11 @@ define('WP_POST_REVISIONS', false);
     - persistent object caching will ease the load on db
     - deliver queries faster
     - reduce demand for resources
-    - improved browsing experience for ligged in users
+    - improved browsing experience for logged-in users
     - to enable persistent object caching
     - we will use redis
       - redis has limited amount of memory
-      - caching badlu coded plugins attempt to store huge amounts of data in db
+      - caching badly coded plugins attempt to store huge amounts of data in db
       - redis will run out of memory
       - server will slow down
   - opcode caching 
@@ -1869,7 +1869,7 @@ Caching Policy
   - server side page caching
   - nginx fastcgi
     - brilliant performance
-    - additional performance -lugins are needed
+    - additional performance plugins are needed
     - easy to set up
     - setting cache exclusions can be complex
     - use to configure only page caching
@@ -1879,7 +1879,7 @@ Caching Policy
     - all in one performance solution
     - no additional plugin needed
     - free version suitable for almost all sites
-    - little complx to setup
+    - little complex to setup
     - can take time to configure
     - used to configure both page and object caching
 - dynamic
@@ -2052,9 +2052,14 @@ enabled = false
 
 To enable, restart the f2b service.
 sudo systemctl restart fail2ban
-
-
+```
+WT3C and redis
+```
+Install W3 total cache plugin
 Comment out all fastcgi nginx changes in nginx.conf, wp-config.php and <your_domain>.conf
+Before activating:
+sudo ./ownership_permissions.sh
+
 # W3TC
 cd /var/www/example.com/public_html/
 sudo touch nginx.conf
@@ -2083,7 +2088,7 @@ The permissions on wp-config.php can be changed back to 644 after we activate w3
 sudo chmod 644 /var/www/site.com/public_html/wp-config.php
 
 cd /etc/nginx/includes/
-sudo nano w3tc_cache_exclusions.conf
+sudo vi w3tc_cache_exclusions.conf
 
 # ---------------------
 # W3 TOTAL CACHE EXCLUDES FILE
@@ -2115,7 +2120,7 @@ location / {
 }
 
 cd /etc/nginx/sites-available/
-sudo nano example.com.conf
+sudo vi example.com.conf
 
 #location / {
 
@@ -2125,6 +2130,10 @@ sudo nano example.com.conf
 
 include /etc/nginx/includes/w3tc_exclusions.conf;
 include /var/www/example.com/public_html/nginx.conf;
+
+supd
+sudo apt install php8.1-tidy
+fpmr
 
 sudo nginx -t
 sudo systemctl reload nginx
@@ -2164,23 +2173,80 @@ sudo nano wp-config.php
 define( 'WP_CACHE_KEY_SALT', 'example.com' );
 
 redis-cli monitor
+```
 
 PHP-FPM
+- configure php-fpm
+- important to set pm.max_children directive value correctly
+- if not set correctly, it may result in your server crashing
+- too low, site will slow down, too high and your site will crash
+- all sites are different
+  - depends on memory used by each child process
+  - memory used by each child process
+  - will vary due to theme and plugins being used
+- recalculate the memory used by each child process
+- after completing your site setup
+- adding, removing or upgrading themes and plugins
+- weekly maintenance task
+- set the directive
+- pm.max_children
+- different for each server and site
+- calculate the memory
+- used by each child process
+- set the directive according to this value
+- configure pm
+- how it controls the max children directive
+
+## FPM Types
+- on demand
+  - child processes are spawn on-demand
+  - suitable for all sites 
+  - no wasted resources
+  - calculate the max memory usage
+  - for a single child process
+  - set the method on demand
+    - set the following directives: 
+      - max children
+      - process idle timeout
+      - max requests
+- static
+  - number of child processes are fixed
+  - excellent for busy sites
+  - processes are ready to serve requests
+  - without needing to be spawned
+  - calculate the max memory usage
+  - for a single child process
+  - set the method to static
+    - set the following directives:
+      - max children
+- dynamic
+  - number of child processes is set dynamically
+```
+PHP-FPM
+Calculate memory used by each child processes: (on-demand and static)
 ps --no-headers -o "rss,cmd" -C php-fpm8.1 | awk '{ sum+=$1 } END { printf ("%d%s\n", sum/NR/1024,"M") }'
+44M
+Take what's available and divide to 44
+500M/44M = 11.36
+production server should have a minimum of 2GB of RAM
 
 ONDEMAND:
 cd /etc/php/8.1/fpm/pool.d/
 ls
 sudo cp www.conf www.conf.bak
-sudo nano www.conf
+sudo vi www.conf
 pm = ondemand
+pm.max_children = 7
 pm.process_idle_timeout = 10s;
 pm.max_requests = 500
 
+fpmr
 sudo systemctl restart php8.1-fpm
 ls /var/log/
-sudo grep max_children /var/log/php8.1-fpm.log
+sudo cat php8.1-fpm.log
 
+Check the log file for warning.
+sudo grep max_children /var/log/php8.1-fpm.log
 Grep will display the following line if it occurs in your log file
 WARNING: [pool www] server reached max_children setting (25), consider raising it
 
