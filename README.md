@@ -1911,10 +1911,10 @@ cd /var/www
 find . -type f -print | grep php | wc -l
 
 sudo nano /etc/php/8.1/fpm/
-sudo nano php.ini
+sudo vi php.ini
 
 cd /etc/nginx
-sudo nano nginx.conf
+sudo vi nginx.conf
 
 We will add the relevant directives to the http context first
 
@@ -1935,6 +1935,10 @@ fastcgi_cache_key "$scheme$request_method$host$request_uri";
 fastcgi_cache_use_stale error timeout invalid_header http_500;
 fastcgi_ignore_headers Cache-Control Expires Set-Cookie;
 
+
+cd sites-available/
+sudo vi
+
 location ~ \.php$ {
     include snippets/fastcgi-php.conf;
     fastcgi_pass unix:/run/php/php8.1-fpm.sock;
@@ -1945,6 +1949,14 @@ location ~ \.php$ {
     fastcgi_cache NAME;
     fastcgi_cache_valid 60m;
 }
+
+ngt
+nginx: [emerg] unknown "skip_cache" variable
+nginx: configuration file /etc/nginx/nginx.conf test failed
+
+cd ..includes/
+sudo vi fastcgi_cache_exclusions.conf
+
 
 DIRECTIVES
 fastcgi_cache_bypass $skip_cache;
@@ -1978,11 +1990,15 @@ if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no
 }
 
 cd /etc/nginx/sites-available
-sudo nano example.com.conf
+sudo vi example.com.conf
 
 Add the include directive underneath the closing curly bracket of the location context that contains the try_files directive.
 include /etc/nginx/includes/fastcgi_cache_exclusions.conf;
 
+
+cd /etc/nginx/sites-available
+sudo vi example.com.conf
+include /etc/nginx/includes/http_headers.conf;
 add_header X-FastCGI-Cache $upstream_cache_status;
 
 As always, test the nginx syntax and then reload nginx to enable the change in configuration.
