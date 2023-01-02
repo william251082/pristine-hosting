@@ -1965,7 +1965,7 @@ fastcgi_cache NAME;
 fastcgi_cache_valid 60m;
 
 cd /etc/nginx/includes/
-sudo nano fastcgi_cache_exclusions.conf
+sudo vi fastcgi_cache_exclusions.conf
 
 # NGINX SKIP CACHE INCLUDE FILE
 set $skip_cache 0;
@@ -2014,6 +2014,7 @@ sudo chmod 664 wp-config
 cd
 sudo ./ownership_permissions.sh
 sudo vi /var/www/pristinehost.uk/public_html/wp-config.php
+
 define('RT_WP_NGINX_HELPER_CACHE_PATH','/var/run/PATH/');
 
 Close vi, saving the changes, then restart the php-fpm process
@@ -2072,7 +2073,7 @@ sudo chmod 664 nginx.conf wp-config.php
 Add directive to wp security file that blocks any attempts to access the file we created.
 cd /etc/nginx/includes/
 
-sudo nano wp_nginx_security_directives.conf
+sudo vi wp_nginx_security_directives.conf
 
 Add the following directive to the wp_security file
 location = /nginx.conf { deny all; }
@@ -2128,12 +2129,15 @@ sudo vi example.com.conf
 
 #}
 
-include /etc/nginx/includes/w3tc_exclusions.conf;
+include /etc/nginx/includes/w3tc_cache_exclusions.conf;
 include /var/www/example.com/public_html/nginx.conf;
 
 supd
 sudo apt install php8.1-tidy
 fpmr
+
+Make a sitemap url and enable cache preload:
+Page Cache > Cache Preload
 
 sudo nginx -t
 sudo systemctl reload nginx
@@ -2147,6 +2151,7 @@ sudo apt install redis-server php8.1-redis
 
 Check the status of redis:
 sudo systemctl status redis-server
+sudo systemctl enable redis-server
 
 Check the redis log for any errors:
 sudo cat /var/log/redis/redis-server.log
@@ -2158,17 +2163,20 @@ sudo nano /etc/sysctl.conf
 vm.overcommit_memory = 1
 sudo sysctl -p
 
+sudo systemctl restart redis-server
 sudo systemctl status redis-server
 sudo cat /var/log/redis/redis-server.log
 
 cd /etc/redis
-sudo nano redis.conf
+sudo cp redis.conf redis.conf.bak
+sudo vi redis.conf
 
 maxmemory 256mb
 maxmemory-policy allkeys-lru
+
 sudo systemctl restart redis-server
 cd /var/www/site.com/public_html/
-sudo nano wp-config.php
+sudo vi wp-config.php
 
 define( 'WP_CACHE_KEY_SALT', 'example.com' );
 
