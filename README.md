@@ -1467,6 +1467,15 @@ sudo ./ownership_permissions.sh
 
 For installing plugins that need to create files in the root of wp files, give public_html 755
 sudo chmod 755 public_html/
+
+public_html directory ownership:
+www-data:www-data
+sudo chown -R www-data:www-data /var/www/pristinehost.uk/public_html/
+
+public_html directory permissions:
+Directories: 644 Files: 755
+sudo find /var/www/pristinehost.uk/public_html/ -type d -exec chmod 775 {} \;
+sudo find /var/www/pristinehost.uk/public_html/ -type f -exec chmod 664 {} \;
 ```
 
 - harden wp using nginx directives
@@ -2269,13 +2278,43 @@ WARNING: [pool www] server reached max_children setting (25), consider raising i
 ![php-fpm.png](diagrams%2Fphp-fpm.png)
 
 CLOUDFLARE
+intro
+  - your site ip is hidden from attackers
+  - protects your site from ddos attacks
+  - and various malicious bots
+  - saves bandwidth
+  - server response time is reduced
+  - caches static resources
+  - css | js |media
+  - with a dynamic wp site
+  - test the cf asset caching thoroughly
+cloudflare server-side implementation
+  - acting as a reverse proxy
+  - cloudflare ip's vs visitor's ip's
+  - server log files 
+  - ensure visitor ip's are recorded in your sever log files
+  - and not the cloudflare ip's
+IMPORTANT
+    - cloudflare captchas ip list page
+    - https://www.cloudflare.com/ips-v4 | https://www.cloudflare.com/ips-v6
+    - do not use an automated script to download clouflare ips
+    - script may fail to download the ip list
+    - corrupt your nginx conf
+    - causing nginx to crash on restart
+    - make use of the X-forwarded-For header
+    - and the CF-Connecting-IP header
+    - use these headers to restore the
+    - originating ip of the visitor in the log files
+    - nginx module http-real-ip installed by default
+    - on your server create a cloudflare include file
+    - add the cloudflare ips to that file
 ```
 CLOUDFLARE
 https://www.cloudflare.com/ips-v4
 https://www.cloudflare.com/ips-v6
 
 cd /etc/nginx/includes
-sudo nano cloudflare_ip_list.conf
+sudo vi cloudflare_ip_list.conf
 
 # Last updated 17 July 2022
 set_real_ip_from 173.245.48.0/20;
@@ -2303,17 +2342,366 @@ set_real_ip_from 2c0f:f248::/32;
 real_ip_header CF-Connecting-IP;
 
 cd /etc/nginx/sites-available/
-sudo nano example.com.conf
+sudo vi example.com.conf
 
 Addition:
 include /etc/nginx/includes/cloudflare_ip_list.conf;
-Close nano saving the changes.
+Close vi saving the changes.
 
 As always, test the syntax and then reload nginx
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+cloudflare dashboard settings:
+- basic config
+- periodically new features are added
+- test new features on a development server
+- change proxy status to proxied
+- set ssl mode to FULL (strict)
+```
+Check if your domain is using cloudflare's ip:
+ping -c1 pristinehost.uk
+
+check for clouflare header:
+curl -I https://<your_domain>
+cf-cache-status: DYNAMIC
+```
+IMPORTANT
+- only do the following if you're using w3tc
+- if using fastcgi, headers are already right
+- duplicate http response headers
+- only happens if you are using w3tc to serve cached pages
+
+Configure in cloudflare
+- SSL 
+- Speed
+- Caching 
+- Rules
+- Network
+- Scrape Shield
+
+Automatic Platform Optimization
+- Cloudflare will cache additional assets and server these assets from the cloudflare network.
+- Requests won't hit your server.
+- optimization for wp
+- 5$ a month
 ![cloudflare.png](..%2F..%2FDesktop%2Fcloudflare.png)
+
+
+
+### TASK
+Server Updates
+  - automated, unattended updates not recommended
+  - server updates are normally safe
+  - a wp theme or plugin update can result in your site going down
+  - hard to troubleshoot
+  - perform regularly
+  - security | bugs | performance
+  - update | upgrade | autoremove
+
+Virus and malware scanning
+  - av scanner will place excessive load on your server
+  - therefore the performance will be degraded
+  - some rootkit names displayed during the scan may offend
+  - sue to the high resource usage of clamav
+  - stop and disable after the service from starting after reboot
+  - run the service manually
+  - anti virus & malware scanning
+    - install | configure | update
+    - clam anti virus
+    - rootkit hunter
+```
+supd
+
+CLAMAV
+sudo apt update
+sudo apt install clamav clamav-daemon
+
+The clam av definition database will be updated automatically after installation. To manually update:
+Stop the CLAM AV Freshclam service to update
+
+sudo systemctl stop clamav-freshclam
+sudo freshclam
+sudo systemctl start clamav-freshclam
+
+MANUAL SCAN:
+sudo clamscan -r /path/2/scan
+
+DISABLE CLAMAV-DAEMON
+sudo systemctl stop clamav-daemon
+sudo systemctl stop clamav-freshclam
+sudo systemctl disable clamav-daemon
+
+TO RUN CLAMAV AFTER DISABLING
+sudo systemctl start clamav-daemon
+sudo systemctl stop clamav-freshclam
+sudo freshclam
+sudo systemctl start clamav-freshclam
+
+Run scan, then disable:
+sudo clamscan -r /path/2/scan
+sudo clamscan -r /var/www/
+sudo clamscan -r /home/andrew/
+
+sudo systemctl stop clamav-daemon
+sudo systemctl stop clamav-freshclam
+sudo systemctl disable clamav-daemon
+sudo systemctl disable clamav-freshclam
+sudo systemctl status clamav-daemon
+sudo systemctl status clamav-freshclam
+
+sudo reboot
+
+sudo systemctl status clamav-daemon
+sudo systemctl status clamav-freshclam
+
+sudo systemctl start clamav-daemon
+sudo freshclam
+sudo systemctl stop clamav-freshclam
+
+RKHUNTER
+sudo apt install rkhunter
+sudo rkhunter --propupd
+sudo rkhunter --checkall --sk
+
+look for rkhunter.log
+cd /var/log
+sudo cat rkhunter.log
+
+The following flags can be used: 
+--sk, --skip-keypress   
+
+sudo cat /var/log/rkhunter.log
+sudo less /var/log/rkhunter.log
+cd /etc/cron.daily/
+sudo rm rkhunter
+cd /etc/cron.weekly/
+sudo rm rkhunter
+
+never use pirated plugins
+```
+
+WP UPDATES
+- core updates
+- theme and plugin updates
+  - update using dashboard
+  - update one or at most two at a time
+  - test your site after each plugin update
+  - issues with badly coded plugins
+  - can and will creah your site
+  - perform a backup prior to any major updates
+- perform a backup prior to any major updates
+- automatic upgrades, not recommended
+- core theme plugin updates can result in your site going down
+Core updates
+- ownership scheme
+- $USER:www-data
+- ownership and permissions will need to be 'relaxed' to allow wp updates
+- to be completed successfully
+- 'tighten' the ownership and permissions
+- after completing the update
+```
+WP UPDATES
+cd ~/bash_scripts
+sudo vi wp_permissions_ownership.sh
+
+#!/bin/bash
+echo "What is your domain name?"
+read domain
+echo "What is your non root server username?"
+read nonroot
+echo Changing Ownership and Permissions
+sudo chown -R $nonroot:www-data /var/www/$domain/public_html/
+sudo find /var/www/$domain/public_html/ -type d -exec chmod 775 {} \;
+sudo find /var/www/$domain/public_html/ -type f -exec chmod 664 {} \;
+
+# Restart the php-fpm process to clear the opcache
+sudo systemctl restart php8.1-fpm
+echo Please open the WP DASHBOARD and UPDATE WP and switch back to terminal AFTER COMPLETING the WP update
+echo ------------------------------------------------------------
+read -p "Finished Updating WordPress? Press ENTER to continue" y
+echo ------------------------------------------------------------
+sudo chown -R $nonroot:www-data /var/www/$domain/public_html/
+sudo find /var/www/$domain/public_html/ -type d -exec chmod 755 {} \;
+sudo find /var/www/$domain/public_html/ -type f -exec chmod 644 {} \;
+sudo find /var/www/$domain/public_html/wp-content/ -type d -exec chmod 775 {} \;
+sudo find /var/www/$domain/public_html/wp-content/ -type f -exec chmod 664 {} \;
+
+# Restart the php-fpm process to clear the opcache
+sudo systemctl restart php8.1-fpm
+echo Changing Ownership and Permissions
+echo DONE…
+
+```
+DB TUNING
+- mysql tuner
+- trun every 60 to 90 days
+- add recommendations one at a time
+- general recommendations
+- variables to adjust
+- restart mdb after adding each directive
+IMPORTANT
+  - innodb log file size directive
+  - stop the mariadb service
+  - modify 50-server.cnf
+  - start mdb
+  - do not modify 50-server.cnf
+  - and restart mdb you may corrupt the innodb tables
+```
+MYSQLTUNER
+cd
+cd MySQLTuner/
+ls -l
+To run mysqltuner, you need to use sudo as mysqltuner needs to login to mariadb
+sudo ./mysqltuner.pl
+```
+phpmyadmin security
+prerequisite steps
+- add a new admin db user
+- disable certain wp security directives
+- that block specific query strings
+- set http auth
+- set ip based restriction
+```
+PHPMYADMIN
+sudo mysql
+GRANT ALL ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY 'password' WITH GRANT OPTION;
+GRANT ALL ON *.* TO 'zpU13Ex9txUc09Nic8Mu'@'localhost' IDENTIFIED BY 'EpnbUguGFQmpZ6y1YZvg' WITH GRANT OPTION;
+flush privileges;
+sudo nano /etc/nginx/includes/wp_nginx_security_directives.conf
+#if ( $args ~* "(localhost|request)" ) { set $susquery 1; }
+
+sudo nginx -t
+sudo systemctl reload nginx
+cd /etc/nginx/includes
+openssl passwd
+Password:
+Verifying - Password:
+sudo vi pma_userpass
+supd
+sudo apt install phpmyadmin
+sudo ln -s /usr/share/phpmyadmin /var/www/example.com/public_html/random_name
+sudo vi /etc/nginx/includes/pma.conf
+
+location ^~ /random_name {
+}
+
+location ^~ /random_name {
+# CONDITIONS
+satisfy all;
+# HTTP AUTHENTICATION
+auth_basic "Sign In";
+auth_basic_user_file /etc/nginx/includes/pma_userpass;
+# IP BASED ACCESS
+# allow ;
+deny all;
+}
+
+last -n3
+
+allow ip_address;
+
+location ^~ /random_name {
+# CONDITIONS
+satisfy all;
+# HTTP AUTHENTICATION
+auth_basic "Sign In";
+auth_basic_user_file /etc/nginx/includes/pma_userpass;
+# IP BASED ACCESS
+# if your IP changes, ssh to your server and use the last command
+# last -n3 (still logged in) is your IP address you need to add to allow
+# allow ip_address;
+deny all;
+try_files $uri $uri/ =404;
+location ~ \.php$ {
+include snippets/fastcgi-php.conf;
+fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+}
+}
+
+Now we need to include this file in one of our sites nginx server block file.
+cd /etc/nginx/sites-available/
+sudo vi example.com.conf
+include /etc/nginx/includes/pma.conf;
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+Open PMA
+https://example.com/random_name/
+
+
+sudo chmod 755 public_html/
+
+public_html directory ownership:
+www-data:www-data
+sudo chown -R www-data:www-data /var/www/pristinehost.uk/public_html/
+
+public_html directory permissions:
+Directories: 644 Files: 755
+sudo find /var/www/pristinehost.uk/public_html/ -type d -exec chmod 775 {} \;
+sudo find /var/www/pristinehost.uk/public_html/ -type f -exec chmod 664 {} \;
+```
+php-fpm tuning
+
+Site Monitoring
+  - uptime robot
+  - excellent free plan
+Server Monitoring
+  - built in tools - htop f6
+  - external monitoring
+    - monitor server in dtail
+    - consume additional resources
+    - server with freely available resources
+    - multi-cpu cores and gigs of memory
+    - can lead to resources issue on a server with limited resources
+    - https://netdata.cloud
+
+
+### MISC TOPICS
+Moving a wp site
+  - make use of host file
+    - restore duplicator backup ona new server
+    - test site thoroughly
+    - when ready to 'move' your site remove
+    - site details from your local hosts file
+    - change dns to new server
+    - site accessible ove http only on new server
+    - install ssl certificate
+    - continue hardening wp site
+    - few minutes downtime
+    - while installing ssl certificate
+    - only if HSTS was enabled by your previous host
+  - allows for a complete non secure
+  - installation of you wp site
+  - easy to use
+  - install wp site
+  - move site from nginx to nginx
+  - use duplicator to move site
+  - https://wordpress.org/plugins/duplicator
+  - steps before moving
+    - activate a default wp theme
+    - deactivate all plugins, except duplicator
+    - set permalinks to plain
+    - run duplicator and download backup files
+    - reverse steps above
+    - set pretty permalinks
+    - activate plugins and preferred theme
+wpcli
+backups
+plugins
+    - keep usage to a minimum
+    - keep updated
+    - research plugin vulnerability history
+    - if a plugin writes to .htacces check for compatible ngins file
+    - always use server tools over plugins
+    - sending site mail backups
+filezilla
+content security policy
+log rotation
+
+
+
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
