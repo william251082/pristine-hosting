@@ -2221,6 +2221,14 @@ PHP-FPM
       - max children
 - dynamic
   - number of child processes is set dynamically
+
+Maintenance:
+  - check on a weekly basis
+  - calculate the max memory usage
+  - set the max children directive accordingly
+  - value dependent on
+  - theme | plugins | caching | traffic
+  - check the php8.1-fpm.log file
 ```
 PHP-FPM
 Calculate memory used by each child processes: (on-demand and static)
@@ -2249,7 +2257,11 @@ Check the log file for warning.
 sudo grep max_children /var/log/php8.1-fpm.log
 Grep will display the following line if it occurs in your log file
 WARNING: [pool www] server reached max_children setting (25), consider raising it
+```
+![php-fpm.png](diagrams%2Fphp-fpm.png)
 
+CLOUDFLARE
+```
 CLOUDFLARE
 https://www.cloudflare.com/ips-v4
 https://www.cloudflare.com/ips-v6
@@ -2293,6 +2305,7 @@ As always, test the syntax and then reload nginx
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+![cloudflare.png](..%2F..%2FDesktop%2Fcloudflare.png)
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
