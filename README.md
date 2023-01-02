@@ -1746,8 +1746,435 @@ press enter
 ```
 
 ### Optimizing WP
+- server side
+  - optimizing os
+  - optimizing web server
+  - configure php-fpm
+  - serve-side caching
+  - set wp max memory
+  - replace wp cron with real cron
+
+- server side optimization
+  - caching
+  - configure php-fpm
+  - replace wp cron with real cron 
+    - wp cron system is used to schedule tasks that run at intervals and on every page load
+    - slow down the site
+    - improve performance and stability of site
+    - replace this with server-side cron
+```
+cd /var/www/<your_domain>/public_html/
+sudo vi wp-config.php
+/** DISABLE WP-CRON */
+define('DISABLE_WP_CRON', true );
+
+fpmr
+crontab -e
+*/15 * * * * wget -q -O - https://example.com/wp-cron.php?doing_wp_cron >/dev/null 2>&1
+crontab -l
+```
+
+- application side:
+  - caching
+  - optimize policy
+  - optimize db
+  - combine minify css and js
+  - post revisions policy
+    - https://wordpress.org/support/article/revisions/
+    - revisions can result in a bloated db
+    - each revision means additional row is added to the db
+    - consider if it's needed
+    - if not, disable revisions completely
+```
+https://wordpress.org/support/article/revisions/
+define('WP_POST_REVISIONS', false);
+```
+![request-process.png](diagrams%2Frequest-process.png)
+
+- CACHING
+  - pages caching 
+    - on most pages contest seldom changes
+    - why query dba nd use php?
+    - to build the page on request?
+    - the solution is to pre-build the page
+    - clients are served these pre-built pages
+    - therefore bypassing php and the database
+  - object caching 
+    - stores db query results
+    - the cached object will be served from the cache (RAM) instead of querying the db
+    - for object caching to be effective
+    - the db queries need to be cached
+    - persistently between page loads
+    - wp has built in object caching
+    - enabled by default
+    - only stores for a single page load
+    - not a persistent object cache
+    - persistent object caching will ease the load on db
+    - deliver queries faster
+    - reduce demand for resources
+    - improved browsing experience for ligged in users
+    - to enable persistent object caching
+    - we will use redis
+      - redis has limited amount of memory
+      - caching badlu coded plugins attempt to store huge amounts of data in db
+      - redis will run out of memory
+      - server will slow down
+  - opcode caching 
+    - for php code to execute, the php compiler has to compile the code first and generate executable code
+    - for the server to execute opcode caches the already compiled code
+    - installed and configured on the server opcache
+```
+# PHP Files
+count number of php files
+cd /var/www
+find . -type f -print | grep php | wc -l
+
+cd /etc/php/8.1/fpm/
+sudo vi php.ini
+
+cd /etc/nginx
+sudo vi nginx.conf
+
+Setup the site completely first.
+If php files are less than 10000, don't make any changes.
+If yes, set to 20000 opcache.max_accelerated_files=20000
+We will add the relevant directives to the http context first.
+```
+  - browser caching 
+    - /etc/nginx/includes/browser_caching.conf;
+![caching.png](diagrams%2Fcaching.png)
 
 
+Static and Dynamic site
+- static
+  - content seldom changes
+  - informational type site
+  - no comments
+  - contact form
+  - very little interaction with visitors
+  - link to sites social media pages
+- dynamic
+  - content changes frequently
+  - any form of ecommerce
+  - forums
+  - active comment section
+  - links to sites social media pages
+
+Caching Policy
+- implementing caching
+  - caching method depends on the type of wp site 
+  - static or dynamic
+- static
+  - page caching
+  - server side page caching
+  - nginx fastcgi
+    - brilliant performance
+    - additional performance -lugins are needed
+    - easy to set up
+    - setting cache exclusions can be complex
+    - use to configure only page caching
+    - additional plugin needed for object caching
+  - wp caching plugin
+  - w3tc
+    - all in one performance solution
+    - no additional plugin needed
+    - free version suitable for almost all sites
+    - little complx to setup
+    - can take time to configure
+    - used to configure both page and object caching
+- dynamic
+  - page caching 
+  - wp caching plugin
+  - w3tc
+  - object caching
+  - redis
+
+```
+Navigate to the comment:
+/* That’s all, stop editing and just above the comment add the directive to disable WP CRON:
+
+define('DISABLE_WP_CRON', true);
+
+Close nano, saving the changes, then I recommend you resstart the php-fpm process to clear the opcache.
+sudo systemctl restart php8.1-fpm
+
+Now we need to create the server cron. This job will run as your non root user and not root.
+crontab -e
+JOB:
+*/15 * * * * wget -q -O - https://example.com/wp-cron.php?doing_wp_cron >/dev/null 2>&1
+
+It's easy to disable revisions, open your site's wp-config.php file and add the following above the comment: /* That’s all Stop editing…
+define('WP_POST_REVISIONS', false);
+
+# PHP Files
+cd /var/www
+find . -type f -print | grep php | wc -l
+
+sudo nano /etc/php/8.1/fpm/
+sudo nano php.ini
+
+cd /etc/nginx
+sudo nano nginx.conf
+
+We will add the relevant directives to the http context first
+
+HTTP CONTEXT
+
+Scroll to just above the comment:
+# Virtual Host Configs
+
+##
+# FASTCGI CACHING
+##
+# fastcgi_cache_path directive - PATH & NAME must be unique for each site
+# Add a new fastcgi_cache_path for each site and give a new keys_zone name
+fastcgi_cache_path /var/run/SITE levels=1:2 keys_zone=NAME:100m inactive=60m;
+
+# applied to all sites
+fastcgi_cache_key "$scheme$request_method$host$request_uri";
+fastcgi_cache_use_stale error timeout invalid_header http_500;
+fastcgi_ignore_headers Cache-Control Expires Set-Cookie;
+
+location ~ \.php$ {
+    include snippets/fastcgi-php.conf;
+    fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+    include /etc/nginx/include_files/fastcgi_optimize.conf;
+    # fastcgi caching directives
+    fastcgi_cache_bypass $skip_cache;
+    fastcgi_no_cache $skip_cache;
+    fastcgi_cache NAME;
+    fastcgi_cache_valid 60m;
+}
+
+DIRECTIVES
+fastcgi_cache_bypass $skip_cache;
+fastcgi_no_cache $skip_cache;
+fastcgi_cache NAME;
+fastcgi_cache_valid 60m;
+
+cd /etc/nginx/includes/
+sudo nano fastcgi_cache_exclusions.conf
+
+# NGINX SKIP CACHE INCLUDE FILE
+set $skip_cache 0;
+
+# POST requests and urls with a query string should always go to PHP
+if ($request_method = POST) {
+    set $skip_cache 1;
+}
+
+if ($query_string != "") {
+    set $skip_cache 1;
+}   
+
+# Don't cache uris containing the following segments
+if ($request_uri ~* "/wp-admin/|/xmlrpc.php|wp-.*.php|/feed/|index.php|sitemap(_index)?.xml") {
+    set $skip_cache 1;
+} 
+
+# Don't use the cache for logged in users or recent commenters
+if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in") {
+    set $skip_cache 1;
+}
+
+cd /etc/nginx/sites-available
+sudo nano example.com.conf
+
+Add the include directive underneath the closing curly bracket of the location context that contains the try_files directive.
+include /etc/nginx/includes/fastcgi_cache_exclusions.conf;
+
+add_header X-FastCGI-Cache $upstream_cache_status;
+
+As always, test the nginx syntax and then reload nginx to enable the change in configuration.
+sudo nginx -t
+sudo systemctl reload nginx
+
+curl -I https://example.com
+curl -I https://www.example.com
+
+define('RT_WP_NGINX_HELPER_CACHE_PATH','/var/run/PATH/');
+Close nano, saving the changes, then restart the php-fpm process
+sudo systemctl restart php8.1-fpm
+
+Under the index directive add the location block that will allow for selective purging of the cache:
+location ~ /purge(/.*) {
+    fastcgi_cache_purge NAME "$scheme$request_method$host$1";
+}
+sudo nginx -t
+sudo systemctl reload nginx
+
+# W3TC
+cd /var/www/example.com/public_html/
+sudo touch nginx.conf
+sudo chown www-data:www-data nginx.conf
+
+ls
+sudo chown $USER:www-data nginx.conf
+sudo chmod 664 nginx.conf wp-config.php
+
+Add directive to wp security file that blocks any attempts to access the file we created.
+cd /etc/nginx/includes/
+
+sudo nano wp_nginx_security_directives.conf
+
+Add the following directive to the wp_security file
+location = /nginx.conf { deny all; }
+
+cd /var/www/example.com/public_html/
+ls -l
+
+Permissions:
+cd /var/www/example.com/public_html/
+sudo chmod 664 nginx.conf wp-config.php
+
+The permissions on wp-config.php can be changed back to 644 after we activate w3tc using the WP dashboard.
+sudo chmod 644 /var/www/site.com/public_html/wp-config.php
+
+cd /etc/nginx/includes/
+sudo nano w3tc_cache_exclusions.conf
+
+# ---------------------
+# W3 TOTAL CACHE EXCLUDES FILE
+# ---------------------
+set $cache_uri $request_uri;
+
+# POST requests and urls with a query string should always go to PHP
+if ($request_method = POST) {
+        set $cache_uri 'null cache';
+}   
+
+if ($query_string != "") {
+        set $cache_uri 'null cache';
+}   
+
+# Don't cache uris containing the following segments
+if ($request_uri ~* "(/wp-admin/|/xmlrpc.php|/wp-(app|cron|login|register|mail).php|wp-.*.php|/feed/|index.php|wp-comments-popup.php|wp-links-opml.php|wp-locations.php|sitemap(_index)?.xml|[a-z0-9_-]+-sitemap([0-9]+)?.xml)") {
+        set $cache_uri 'null cache';
+}   
+
+# Don't use the cache for logged in users or recent commenters
+if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in") {
+        set $cache_uri 'null cache';
+}
+
+# Use cached or actual file if they exists, otherwise pass request to WordPress
+location / {
+        try_files /wp-content/w3tc/pgcache/$cache_uri/_index.html $uri $uri/ /index.php?$args;
+}
+
+cd /etc/nginx/sites-available/
+sudo nano example.com.conf
+
+#location / {
+
+#    try_files $uri $uri/ /index.php$is_args$args;
+
+#}
+
+include /etc/nginx/includes/w3tc_exclusions.conf;
+include /var/www/example.com/public_html/nginx.conf;
+
+sudo nginx -t
+sudo systemctl reload nginx
+sudo apt install php8.1-tidy
+
+# REDIS
+curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+sudo apt-get update
+sudo apt install redis-server php8.1-redis
+
+Check the status of redis:
+sudo systemctl status redis-server
+
+Check the redis log for any errors:
+sudo cat /var/log/redis/redis-server.log
+
+Issues:
+WARNING overcommit_memory is set to 0! Background save may fail under low memory condition.
+
+sudo nano /etc/sysctl.conf
+vm.overcommit_memory = 1
+sudo sysctl -p
+
+sudo systemctl status redis-server
+sudo cat /var/log/redis/redis-server.log
+
+cd /etc/redis
+sudo nano redis.conf
+
+maxmemory 256mb
+maxmemory-policy allkeys-lru
+sudo systemctl restart redis-server
+cd /var/www/site.com/public_html/
+sudo nano wp-config.php
+
+define( 'WP_CACHE_KEY_SALT', 'example.com' );
+
+redis-cli monitor
+
+PHP-FPM
+ps --no-headers -o "rss,cmd" -C php-fpm8.1 | awk '{ sum+=$1 } END { printf ("%d%s\n", sum/NR/1024,"M") }'
+
+ONDEMAND:
+cd /etc/php/8.1/fpm/pool.d/
+ls
+sudo cp www.conf www.conf.bak
+sudo nano www.conf
+pm = ondemand
+pm.process_idle_timeout = 10s;
+pm.max_requests = 500
+
+sudo systemctl restart php8.1-fpm
+ls /var/log/
+sudo grep max_children /var/log/php8.1-fpm.log
+
+Grep will display the following line if it occurs in your log file
+WARNING: [pool www] server reached max_children setting (25), consider raising it
+
+CLOUDFLARE
+https://www.cloudflare.com/ips-v4
+https://www.cloudflare.com/ips-v6
+
+cd /etc/nginx/includes
+sudo nano cloudflare_ip_list.conf
+
+# Last updated 17 July 2022
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2a06:98c0::/29;
+set_real_ip_from 2c0f:f248::/32;
+real_ip_header CF-Connecting-IP;
+
+cd /etc/nginx/sites-available/
+sudo nano example.com.conf
+
+Addition:
+include /etc/nginx/includes/cloudflare_ip_list.conf;
+Close nano saving the changes.
+
+As always, test the syntax and then reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
+```
 ## Support
 
 <a href="https://www.buymeacoffee.com/pristineweb" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/purple_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a>
