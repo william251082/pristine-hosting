@@ -3197,117 +3197,52 @@ Create SSL include file:
 cd /etc/nginx/ssl/
 ls
 Copy your previous sites file
-
 sudo cp ssl_example.com.conf ssl_examplecom.conf
-
 sudo nano ssl_example.com.conf
-
 server {
-
     listen 80;
-
     server_name example.com www.example.com;
-
     # ADD REDIRECT TO HTTPS: 301 PERMANENT 302 TEMPORARY
-
     return 301 https://www.example.com$request_uri;
-
 }
 
-
-
 Modify existing server block:
-
-
-
 # EDIT LISTEN DIRECTIVES: ADD 443 HTTP2 AND SSL
-
 listen 443 http2 ssl;
-
 # ADD SITE AND ALL SSL INCLUDE FILES
-
 include /etc/nginx/ssl/ssl_example.com.conf;
-
 include /etc/nginx/ssl/ssl_all_sites.conf;
 
-
-
 Close nano, saving the changes.
-
-
-
 Test the nginx syntax and if the test is successful , reload nginx
-
 sudo nginx -t
-
 sudo systemctl reload nginx
-
-
 
 Serve site over https only:
-
 Open your sites Dashboard and Select Settings | General and then change the WordPress Address (URL) and the Site Address (URL) from http to https. Then Save Changes. From this point all content will be served over https only.
-
-
-
 Test SSL Certificate: ssllabs.com
 
-
-
 Harden the https response headers and general WP security: open your sites server block file using nano
-
-
-
 cd /etc/nginx/sites-available/
-
 sudo nano example.com.conf
-
 include /etc/nginx/includes/http_headers.conf;
-
 include /etc/nginx/includes/wp_nginx_security_directives.conf;
 
-
-
 Implement Rate Limiting:
-
 include /etc/nginx/includes/rate_limiting.conf;
-
-
-
 Implement DDoS Protection:
-
-
-
 In your sites server block configuration file, add the limit request zone directive. You can add the directive underneath the try_files directive.
-
 limit_req zone=ip_address nodelay;
 
-
-
 Test configuration and then reload nginx
-
-
-
 sudo nginx -t
-
 sudo systemctl reload nginx
 
-
-
 OWNERSHIP AND PERMISSIONS
-
-
-
 For this site, I'm going to set the owner and group owner to www-data and the permissions to 755 for directories and 644 for files.
-
-
-
 cd /var/www/example.com/
-
 sudo chown -R www-data:www-data public_html/
-
 sudo find /var/www/example.com/public_html/ -type d -exec chmod 755 {} \;
-
 sudo find /var/www/example.com/public_html/ -type f -exec chmod 644 {} \;
 
 OPTIMIZING WORDPRESS (caching)
@@ -3315,149 +3250,69 @@ I'll be using fastcgi caching for this domain.
 cd /etc/nginx
 sudo nano nginx.conf
 In the FASTCGI CACHING section, add the directive:
-
 fastcgi_cache_path /var/run/SITE levels=1:2 keys_zone=NAME:100m inactive=60m;
-
-
 
 CHANGE THE PATH and the keys_zone NAME - MUST BE UNIQUE FOR THIS SITE
 
-
-
 Open your sites server block file:
-
 cd /etc/nginx/sites-available
-
 sudo nano example.com.conf
 
-
-
 Add the following directives in the php location context: NAME must match the keys_zone value set in the fastcgi_cache_path
-
-
-
 # fastcgi caching directives
-
 fastcgi_cache_bypass $skip_cache;
-
 fastcgi_no_cache $skip_cache;
-
 fastcgi_cache NAME;
-
 fastcgi_cache_valid 60m;
-
-
 
 Now we need to add the fastcgi exclusions include file and the X-FastCGI-Cache directive, add them underneath the try_files directive
 
-
-
 include /etc/nginx/includes/fastcgi_cache_excludes.conf;
-
-
-
 add_header X-FastCGI-Cache $upstream_cache_status;
-
-
 
 Under the index directive, add the fastcgi_cache_purge directive: NAME must match the keys_zone value set in the fastcgi_cache_path
 
-
-
 location ~ /purge(/.*) {
-
     fastcgi_cache_purge NAME "$scheme$request_method$host$1";
-
 }
 
-
-
 Close nano saving your changes
-
-
-
 Open your sites wp-config.php file
-
-
 
 cd /var/www/example.com/public_html/
 
-
-
 sudo nano wp-config.php
-
-
 
 Add the NGINX HELPER CACHE PATH directive to the file, must match the fastcgi_cache_path set in nginx.conf for this site
 
-
-
 define('RT_WP_NGINX_HELPER_CACHE_PATH','/var/run/PATH/');
-
-
 
 As always, test the nginx syntax and then reload nginx to enable the change in configuration.
 
-
-
 sudo nginx -t
-
 sudo systemctl reload nginx
 
-
-
 Restart the php8.1-fpm process
-
 sudo systemctl restart php8.1-fpm
 
-
-
 Open the dashboard and install NGINX Helper
-
-
-
 At this stage you can follow the CF lecture and configure CF, firstly on the server and then using the CF dashboard.
 
-
-
 ADDITIONAL SITE - SUB DOMAIN
-
-
-
 Just a reminder, there is no www cname record for a sub domain. I am creating a sub domain dev, so my url will be dev.example.com
 
-
-
 DIRECTORY STRUCTURE
-
-
-
 cd ~/bash_scripts/
-
 ls
-
 sudo ./create_dirs.sh
 
-
-
 NGINX SERVER BLOCK
-
-
-
 Change to the /etc/nginx/sites-available/ directory
-
 cd /etc/nginx/sites-available/
-
 ls
-
 sudo nano dev.example.com.conf
 
-
-
 CONTENTS:
-
-
-
 server {
     listen 80;
     listen [::]:80;
@@ -3491,486 +3346,211 @@ I'll use a script to create my db
 The random WP admin username and password
 cat /dev/urandom | tr -dc 'a-za-z0-9' | fold -w 30 | head -n 2
 Generate the WP Salts:
-
-
-
 curl -s https://api.wordpress.org/secret-key/1.1/salt/
 
-
-
 The WP directives you need to add to wp-config.php
-
-
-
 /** Allow Direct Updating Without FTP */
-
 define('FS_METHOD', 'direct');
-
 /** Disable Editing of Themes and Plugins Using the Built In Editor */
-
 define('DISALLOW_FILE_EDIT', 'true');
-
 /** Increase WordPress Memory Limit */
-
 define('WP_MEMORY_LIMIT', '256M');
-
 /** TURN OFF AUTOMATIC UPDATES */
-
 define('WP_AUTO_UPDATE_CORE', false );
-
-
 
 Download WP
 
-
-
 wget https://wordpress.org/latest.tar.gz
-
 ls
-
-
 
 Use the tar command to extract the file
 
-
-
 tar xf latest.tar.gz
-
 ls
-
-
 
 A listing displays a directory called wordpress, change to that directory:
-
-
-
 cd wordpress/
-
 ls
-
-
-
 A listing displays the familiar WP files and directories. We need to rename the wp-config-sample.php file to wp-config.php. You use the mv command to rename a file
-
-
-
 mv wp-config-sample.php wp-config.php
-
 ls
-
-
-
 Modify wp-config.php with above details: database, salts, prefix and directives
-
-
-
 Move WP into the document root of your site
 
-
-
 cd ~/wordpress/
-
 sudo mv * /var/www/dev.example.com/public_html/
-
-
-
 Now we need to set the ownership.
 
-
-
 cd /var/www/dev.example.com
-
 sudo chown -R www-data:www-data public_html/
-
 ls -l
 
-
-
 At this stage I need to compete the installation process using my browser.
-
-
-
 INSTALL SSL CERTIFICATE
-
-
-
 sudo certbot certonly --webroot -w /var/www/dev.example.com/public_html/ -d dev.example.com
 
-
-
 Create SSL include file:
-
 cd /etc/nginx/ssl/
-
 ls
-
-
-
 Copy your previous sites file
-
-
-
 sudo cp ssl_example.com.conf ssl_dev.example.com.conf
-
-
-
 Open in nano and change the domain name: use CTRL + \ to search and replace
-
-
-
 sudo nano ssl_dev.example.com.conf
 
-
-
 Close nano saving your changes.
-
-
-
 Now we need to create a secure server block
-
-
-
 Add http to https redirect:
-
-
-
 server {
-
     listen 80;
-
     server_name dev.example.com;
-
     # ADD REDIRECT TO HTTPS: 301 PERMANENT 302 TEMPORARY
-
     return 301 https://dev.example.com$request_uri;
-
 }
 
-
-
 Modify existing server block:
-
-
-
 # EDIT LISTEN DIRECTIVES: ADD 443 HTTP2 AND SSL
-
 listen 443 http2 ssl;
-
 listen [::]:443 http2 ssl;
 
 # ADD SITE AND ALL SSL INCLUDE FILES
-
 include /etc/nginx/ssl/ssl_dev.example.com.conf;
-
 include /etc/nginx/ssl/ssl_all_sites.conf;
 
-
-
 Close nano, saving the changes.
-
-
-
 Test the nginx syntax and if the test is successful, reload nginx
-
 sudo nginx -t
-
 sudo systemctl reload nginx
-
-
-
 Serve site over https only:
-
-
-
 Open your sites WordPress Dashboard and Select Settings | General and then change the WordPress Address (URL) and the Site Address (URL) from http to https. Then Save Changes. From this point all content will be served over https only.
 
-
-
 Test SSL Certificate: ssllabs.com
-
-
-
 Harden the https response headers and general WP security: open your sites server block file using nano
 
-
-
 cd /etc/nginx/sites-available/
-
 sudo nano dev.example.com.conf
 
 Include directives:
-
 include /etc/nginx/includes/http_headers.conf;
-
 include /etc/nginx/includes/wp_nginx_security_directives.conf;
 
 Implement Rate Limiting:
-
 # Rate Limiting Include
-
 include /etc/nginx/includes/rate_limiting.conf;
 
-
-
 Implement DDoS Protection:
-
 In your sites server block configuration file, add the limit request zone directive. You can add the directive underneath the try_files directive.
-
-
-
 limit_req zone=ip_address nodelay;
 
-
-
 Test configuration and then reload nginx
-
 sudo nginx -t
-
 sudo systemctl reload nginx
 
-
-
 OWNERSHIP AND PERMISSIONS
-
 For this site, i'm going to set the owner and group owner to www-data and the permissions to 755 for directories and 644 for files.
 
-
-
 cd /var/www/dev.example.com/
-
 sudo chown -R $USER:www-data public_html/
-
 sudo find /var/www/dev.example.com/public_html/ -type d -exec chmod 755 {} \;
-
 sudo find /var/www/dev.example.com/public_html/ -type f -exec chmod 644 {} \;
-
 sudo find /var/www/dev.example.com/public_html/wp-content/ -type d -exec chmod 775 {} \;
-
 sudo find /var/www/dev.example.com/public_html/wp-content/ -type f -exec chmod 664 {} \;
-
 sudo chmod 775 public_html/
-
 sudo chmod public_html/wp-config.php 664
 
-
-
 Once my site is setup, I'll change the permissions on:
-
-
-
 wp-config.php to 644
-
 public_html to 755
 
-
-
 OPTIMIZING WORDPRESS (caching)
-
-
-
 cd /var/www/dev.example.com/public_html/
-
-
-
 sudo touch nginx.conf
-
 sudo chown $USER:www-data nginx.conf
-
 sudo chmod 664 nginx.conf
-
 ls -l
-
-
-
 Permissions on wp-config.php are correct.
-
-
-
 Ensure that access to the w3tc nginx.conf file is blocked.
-
 cd /etc/nginx/includes/
-
 sudo nano wp_nginx_security_directives.conf
 
-
-
 Add the following directive to the wp_nginx_security_directives.conf file
-
 location = /nginx.conf { deny all; }
 
-
-
 We need to create a w3tc excludes file, that is a file that contains uri's that we don’t want to be cached:
-
 Change to the includes directory and create a file: w3tc_cache_excludes.conf
-
 I created this file earlier in the course, if you didnt create this file, please refer to the W3TC section of Optimizing WP
 
-
-
 cd /etc/nginx/includes/
-
 sudo nano w3tc_cache_excludes.conf
-
-
-
 This file is for the cache exclusions
-
-
-
 Contents:
-
 # ---------------------
-
 # W3 TOTAL CACHE EXCLUDES FILE
-
 # ---------------------
-
 set $cache_uri $request_uri;
 
-
-
 # POST requests and urls with a query string should always go to PHP
-
 if ($request_method = POST) {
-
         set $cache_uri 'null cache';
-
 }   
 
 if ($query_string != "") {
-
         set $cache_uri 'null cache';
-
 }   
-
 # Don't cache uris containing the following segments
-
 if ($request_uri ~* "(/wp-admin/|/xmlrpc.php|/wp-(app|cron|login|register|mail).php|wp-.*.php|/feed/|index.php|wp-comments-popup.php|wp-links-opml.php|wp-locations.php|sitemap(_index)?.xml|[a-z0-9_-]+-sitemap([0-9]+)?.xml)") {
-
         set $cache_uri 'null cache';
-
 }   
 
 # Don't use the cache for logged in users or recent commenters
-
 if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in") {
-
         set $cache_uri 'null cache';
-
 }
-
 # Use cached or actual file if they exists, otherwise pass request to WordPress
-
 location / {
-
         try_files /wp-content/w3tc/pgcache/$cache_uri/_index.html $uri $uri/ /index.php?$args;
-
 }
-
-
 
 Please take note of the last context in the file: location / we already have a location / in our sites server block file. You cannot have duplicate contexts or directives in the same context. When adding this include file in our sites server block configuration file, we will need to remove the existing location / context in the file.
-
-
-
 Comment or remove the original location / context that encloses the try_files directive. I suggest you comment the directive, just in case you are not happy with w3tc and want to remove w3tc.
 
 cd /etc/nginx/sites-available/
-
 sudo nano dev.example.com
-
-
 
 We need to add two w3tc include files, the w3tc cache exclusions and the w3tc nginx.conf file
 
-
-
 #location / {
-
 #    try_files $uri $uri/ /index.php$is_args$args;
-
 #}
-
-
-
 Underneath the http headers and wp security include files, add the w3tc includes:
 
-
-
 include /etc/nginx/includes/w3tc_excludes.conf;
-
 include /var/www/dev.example.com/public_html/nginx.conf;
 
-
-
 I also recommend you install the php8.1-tidy package, this will allow w3tc to optimise the html code. If you didn’t install it earlier, please do so now
-
 sudo apt update
-
 sudo apt install php8.1-tidy
 
-
-
 REDIS
-
-
-
-
-
 You need to edit wp-config.php' file to add a cache key salt with the name of your site.
-
-c
-
-d /var/www/dev.example.com/public_html/
-
+cd /var/www/dev.example.com/public_html/
 sudo nano wp-config.php
 
-
-
 Immediately after the WordPress unique Keys and Salts section, comment the existing directive if it exists, `WP_CACHE_SALT_KEY` and add the following with your site's url:
-
-
-
 define( 'WP_CACHE_KEY_SALT', 'dev.example.com' );
 
-
-
 When you have multiple sites on your server, adding the wp cache key salt will prevent users from being redirected to the wrong site.
-
 As always, test the nginx syntax and then reload nginx to enable the change in configuration.
 
-
-
 sudo nginx -t
-
 sudo systemctl reload nginx
-
-
-
 Restart the php8.1-fpm process
-
-
-
 sudo systemctl restart php8.1-fpm
 
-
-
 Open the WP Dashboard and install w3tc. Activate w3tc, then click settings…
-
-
-
 You need to accept the terms of use and privacy policy
-
-
-
 Make use of the setup guide and set the basic w3tc configuration.
-
-
-
 Configuration of the plugin is the same as the first site I setup. Please refer to that section.
 ```
-
 
 
 ## Support
