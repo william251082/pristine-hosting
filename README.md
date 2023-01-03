@@ -8,6 +8,18 @@
 
 * [Deciding for a VPS hosting service](#deciding-for-a-vps-hosting-service)
 * [Account Flow](#account-flow)
+* [Basic Server Hardening](#basic-server-hardening)
+* [Hardened and optimize server distribution](#hardened-and-optimize-server-distribution)
+* [Installing Lemp Stack](#installing-lemp-stack)
+* [Server Mail](#server-mail)
+* [Harden and Optimize Mariadb](#harden-and-optimize-mariadb)
+* [Harden and Optimize Php81](#harden-and-optimize-php81)
+* [Server and Site File Dir Structure](#server-and-site-file-dir-structure)
+* [Install WP](#install-wp)
+* [Harden WP](#harden-wp)
+* [FPM Types](#fpm-types)
+* [TASK](#task)
+* [MISC TOPICS](#misc-topics)
 
 
 ### Deciding for a VPS hosting service
@@ -95,7 +107,8 @@ sudo cp jail.conf jail.local
 25. ```sudo less /var/log/fail2ban.log```
 26. Unban an Ip ```sudo fail2ban-client set sshd unbanip <ip>```
 
-### Hardened and optimize server distribution/OS (Performance and Security)
+### Hardened and optimize server distribution
+Hardened and optimize server distribution/OS (Performance and Security)
 1. Set the timezone of the server. 
 ```
 sudo timedatectl
@@ -283,7 +296,7 @@ A        <your_domain>     <your_server_ip>     DNS only    Auto
 CNAME    www               <your_domain>        DNS only    Auto
 ```
 
-### Installing LEMP Stack
+### Installing Lemp Stack
 Only download official ubuntu package.
 Ondrej nginx repo
 Ondrej php repo
@@ -655,7 +668,7 @@ alias ngin='cd /etc/nginx/includes/ && ls'
 su <user>
 ```
 
-## Harden and optimize MariaDB
+## Harden and Optimize MariaDb
 ```
 cd
 sudo mysql_secure_installation
@@ -842,7 +855,7 @@ cat /proc/<pid>/limits
 ```
 
 
-## Harden and optimize PHP81
+## Harden And Optimize Php81
 - php 8.1 eol 25-10-24
 - ubuntu/ondrej php 8.1 release supported until april 2027
 - 50% faster than 7.4 and 8.0
@@ -953,7 +966,7 @@ ps aux | grep php-fpm
 cat /proc/<pid>/limits
 ```
 
-### Server and site file dir structure
+### Server and Site File Dir Structure
 - web and doc root
   - default web root - /var/www/
   - doc root - /var/www/<your_domain_name>.com/public_html/
@@ -2276,7 +2289,7 @@ sudo grep max_children /var/log/php8.1-fpm.log
 Grep will display the following line if it occurs in your log file
 WARNING: [pool www] server reached max_children setting (25), consider raising it
 ```
-![php-fpm.png](diagrams%2Fphp-fpm.png)
+![php-fpm.png](diagrams%2Fphpfpm.png)
 
 CLOUDFLARE
 intro
