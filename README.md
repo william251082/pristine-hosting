@@ -2566,7 +2566,6 @@ prerequisite steps
 PHPMYADMIN
 sudo mysql
 GRANT ALL ON *.* TO 'dbadmin'@'localhost' IDENTIFIED BY 'password' WITH GRANT OPTION;
-GRANT ALL ON *.* TO 'zpU13Ex9txUc09Nic8Mu'@'localhost' IDENTIFIED BY 'EpnbUguGFQmpZ6y1YZvg' WITH GRANT OPTION;
 flush privileges;
 sudo nano /etc/nginx/includes/wp_nginx_security_directives.conf
 #if ( $args ~* "(localhost|request)" ) { set $susquery 1; }
@@ -2756,8 +2755,1408 @@ content security policy
           - img-src and font-src
           - embedded data
 ![csp-directives.png](diagrams%2Fcsp-directives.png)
+```
+CSP
+Add this in http_headers.conf:
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: ; media-src 'self'; frame-src 'self'; font-src 'self' data: ; connect-src 'self' ; frame-ancestors 'self';";
 
-log rotation
+sudo vi http_headers.conf
+As the headers file is already included in our sites server block conf file, these directives will be applied when I reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
+
+Fix console errors:
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; object-src 'self'; style-src 'self' 'unsafe-inline' https://*.googleapis.com/; img-src 'self' data: https://*.gravatar.com/ https://*.w.org/ http://www.w3.org/ https://pristinehost.uk/; media-src 'self'; frame-src 'self' https://*.youtube-nocookie.com/; font-src 'self' data: https://*.w.org/ https://*.gstatic.com; connect-src 'self'; frame-ancestors 'self'; worker-src 'self' blob:;";
+```
+LOG ROTATE
+- system utility that's responsible for administration of your server log files.
+- log files are rotated, compressed and deleted
+- without logrotate, log files would grow in size and eventually use 
+- up all the disk space on your server
+- rotate logs daily
+- compress older logs
+- keep older logs for 3 days
+- the above configuration will keep
+- servers log file sizes under control
+```
+LOG ROTATE
+cd /etc/logrotate.d/
+ls
+We are going to change the following file:
+sudo vi fail2ban
+fail2ban
+/var/log/fail2ban.log {
+    daily
+    rotate 3
+
+sudo vi nginx
+nginx
+/var/log/nginx/*.log {
+        daily
+        missingok
+        rotate 3
+
+sudo vi rsyslog
+/var/log/messages {
+        rotate 3
+        daily
+rsyslog
+sudo vi ufw
+ufw
+/var/log/ufw.log
+{
+        rotate 3
+        daily
+
+In each file, change weekly to daily and rotate to 3.
+sudo nano fail2ban
+sudo nano nginx
+sudo nano rsyslog
+sudo nano ufw
+
+
+```
+DENY ACCESS to SERVER IP
+- do not redirect server ip to a site
+- nging default file
+- deny access to the server ip (403)
+- return "no response" (444)
+```
+NGINX DDOS
+curl -I ip  return 403
+curl -i ip  return 444
+
+cd /etc/nginx/sites-available
+sudo nano default
+ location / {
+                # First attempt to serve request as file, then
+                # as directory, then fall back to displaying a 404.
+                try_files $uri $uri/ =404; 
+                return 444;
+        }
+```
+- keep files tidy
+- remove commented directives
+- add own comments
+- NGINX BACKLOG VARIABLE
+  - default very low
+  - with increase traffic
+  - you need to increase the backlog for better performance
+  - set backlog in one listen directive as socket
+  - options are only allowed to be specified once
+  - IMPORTANT
+    - set backlog option on a single listening socket only
+```
+only set on a single listening socket
+sudo vi example.com.conf
+listen 80 backlog=4096;
+listen 443 ssl http2 backlog=4096;
+```
+DDOS PROTECTION
+- problems
+- rate limited while creating a post
+- fail2ban banned my ip
+- disabled rate limiting
+- enable rate limiting and set exclusions
+- your ip | search engines | cloudflare
+- cidr calculator
+  https://www.ipaddressguide.com/cidr
+```
+sudo vi nginx_ddos.conf
+
+geo $limited {
+      default           1;
+      
+      # IP'S ADDED IN CIDR FORMAT
+      # USE https://account.arin.net/public/cidrCalculator
+      # Your IP - change as needed
+      111.222.333.444/32  0;
+      # SEARCH ENGINE EXCLUSIONS
+      # Get list from https://www.ip2location.com/free/robot-whitelist
+      # May need to register for a free account
+      # YAHOO
+      72.30.14.82/31  0;
+      72.30.14.2/31  0;
+      74.6.168.132/30  0;
+      # BING
+      13.66.128.0/17  0;
+      131.253.38.128/26  0;
+      131.253.46.0/23  0;
+      157.55.108.0/23  0;
+      157.55.110.0/23  0;
+      157.55.13.64/26  0;
+      157.55.16.0/20  0;
+      157.55.32.0/25  0;
+      157.55.32.128/25  0;
+      157.55.33.0/25  0;
+      157.55.33.128/25  0;
+      157.55.39.0/24  0;
+      157.55.48.0/24  0;
+      157.56.228.0/22  0;
+      157.56.92.0/22  0;
+      199.30.18.0/23  0;
+      199.30.27.192/26  0;
+      207.46.12.0/24  0;
+      207.46.128.0/19  0;
+      207.46.13.0/24  0;
+      207.46.192.0/24  0;
+      207.46.195.0/24  0;
+      207.46.198.0/24  0;
+      207.46.199.128/25  0;
+      207.46.204.0/22  0;
+      23.103.64.0/18  0;
+      40.112.128.0/17  0;
+      40.113.0.0/18  0;
+      40.114.0.0/17  0;
+      40.115.128.0/17  0;
+      40.117.32.0/19  0;
+      40.121.0.0/16  0;
+      40.122.0.0/16  0;
+      40.123.192.0/19  0;
+      40.124.0.0/16  0;
+      40.125.64.0/18  0;
+      40.74.64.0/18  0;
+      40.75.64.0/18  0;
+      40.76.0.0/16  0;
+      40.77.0.0/17  0;
+      40.77.167.0/24  0;
+      40.77.169.0/24  0;
+      40.77.183.0/24  0;
+      40.77.188.0/22  0;
+      40.77.202.0/24  0;
+      40.78.0.0/17  0;
+      40.81.16.0/20  0;
+      40.82.128.0/19  0;
+      40.83.64.0/18  0;
+      40.84.128.0/17  0;
+      40.86.0.0/17  0;
+      40.86.160.0/19  0;
+      40.87.0.0/17  0;
+      40.88.0.0/16  0;
+      65.52.104.0/24  0;
+      65.52.108.0/23  0;
+      65.52.111.0/24  0;
+      65.52.192.0/19  0;
+      65.54.247.133/32  0;
+      65.55.213.192/26  0;
+      65.55.219.128/25  0;
+      65.55.24.128/25  0;
+      65.55.52.64/26  0;
+      65.55.55.136/29  0;
+      # GOOGLE
+      209.85.233.150/31  0;
+      216.58.212.67/32  0;
+      34.108.0.0/16  0;
+      64.233.171.140/30  0;
+      66.102.5.0/24  0;
+      66.102.8.75/32  0;
+      66.249.64.0/24  0;
+      66.249.65.0/26  0;
+      66.249.65.70/31  0;
+      66.249.65.195/32  0;
+      66.249.65.206/31  0;
+      66.249.65.66/31  0;
+      66.249.66.0/26  0;
+      66.249.66.80/28  0;
+      66.249.66.131/32  0;
+      66.249.66.132/31  0;
+      66.249.66.135/32  0;
+      66.249.66.136/29  0;
+      66.249.66.203/32  0;
+      66.249.66.204/30  0;
+      66.249.66.78/31  0;
+      66.249.67.0/24  0;
+      66.249.68.0/26  0;
+      66.249.68.88/29  0;
+      66.249.69.76/30  0;
+      66.249.72.169/32  0;
+      66.249.72.170/31  0;
+      66.249.73.78/31  0;
+      66.249.73.32/27  0;
+      66.249.74.6/31  0;
+      66.249.74.32/27  0;
+      66.249.76.0/27  0;
+      66.249.76.142/31  0;
+      66.249.76.66/31  0;
+      66.249.77.0/24  0;
+      66.249.79.78/31  0;
+      66.249.79.106/32  0;
+      66.249.79.108/32  0;
+      66.249.79.110/31  0;
+      66.249.79.14/31  0;
+      66.249.82.0/24  0;
+      66.249.83.0/24  0;
+      66.249.93.200/29  0;
+      72.14.199.0/24  0;
+      74.125.149.0/24  0;
+      74.125.208.28/30  0;
+      8.8.8.0/24  0;
+      # DUCKDUCKGO
+      72.94.249.32/29  0;
+      #PINTEREST
+      54.236.1.0/24  0;
+      # CLOUDFLARE
+      173.245.48.0/20  0;
+      103.21.244.0/22  0;
+      103.22.200.0/22  0;
+      103.31.4.0/22  0;
+      141.101.64.0/18  0;
+      108.162.192.0/18  0;
+      190.93.240.0/20  0;
+      188.114.96.0/20  0;
+      197.234.240.0/22  0;
+      198.41.128.0/17  0;
+      162.158.0.0/15  0;
+      104.16.0.0/13  0;
+      104.24.0.0/14  0;
+      172.64.0.0/13  0;
+      131.0.72.0/22  0;
+    }
+
+map $limited $limit {
+1        $binary_remote_addr;
+0        "";
+}
+
+limit_req_zone $limit zone=ip_address:10m rate=100r/s;
+
+
+uncomment in example.com.conf
+# Server Context
+limit_req zone=ip_address nodelay;
+
+https://www.ip2location.com/free/robot-whitelist
+```
+### MULTIPLE SITES AND SUB DOMAINS
+```
+ADDITIONAL SITE - DOMAIN
+
+
+
+DIRECTORY STRUCTURE
+
+
+
+Run the script to create your site directories, it's located in your user's home directory, in a sub directory called bash scripts
+
+cd ~/bash_scripts/
+
+ls
+
+sudo ./create_dirs.sh
+
+
+
+NGINX SERVER BLOCK
+
+
+
+We need to create a non secure server block for the new site.
+
+
+
+Change to the /etc/nginx/sites-available/ directory
+
+cd /etc/nginx/sites-available/
+
+ls
+
+sudo nano example.com.conf
+
+
+
+server {
+
+    listen 80;
+
+    listen [::]:80;
+
+
+
+    server_name example.com www.example.com;   
+
+
+
+    root /var/www/example.com/public_html;   
+
+
+
+    index index.php;
+
+
+
+    location / {
+
+        try_files $uri $uri/ /index.php$is_args$args;
+
+    }
+
+
+
+    location ~ \.php$ {
+
+        include snippets/fastcgi-php.conf;
+
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+
+        include /etc/nginx/includes/fastcgi_optimize.conf;
+
+    }
+
+
+
+    include /etc/nginx/includes/browser_caching.conf;
+
+
+
+    access_log /var/log/nginx/access_example.com.log combined buffer=256k flush=60m;
+
+    error_log /var/log/nginx/error_example.com.log;
+
+}
+
+
+
+Close nano, saving your changes.
+
+
+
+sudo ln -s /etc/nginx/sites-available/example.com.conf /etc/nginx/sites-enabled/
+
+
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+INSTALL WORDPRESS
+
+
+
+The Database:
+
+
+
+I'll use a script to create my db:
+
+
+
+#!/bin/bash
+
+
+
+echo "What is your domain name?"
+
+read domain
+
+DB="$domain"
+
+# create random database user
+
+DBUSER="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 12 | head -n 1)"
+
+# create random password
+
+PASSWORD="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 12 | head -n 1)"
+
+# create random database prefix
+
+PREFIX="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 4 | head -n 1)"
+
+sudo mysql <<MYSQL_SCRIPT
+
+CREATE DATABASE ${DB};
+
+CREATE USER ${DBUSER}@localhost IDENTIFIED BY '${PASSWORD}';
+
+GRANT ALL PRIVILEGES ON ${DB}.* TO '${DBUSER}'@'localhost';
+
+FLUSH PRIVILEGES;
+
+MYSQL_SCRIPT
+
+
+
+echo "-------------------------------------------------------"
+
+echo "WordPress Database Credentials:"
+
+echo
+
+echo "Database: ${DB}"
+
+echo "User:     ${DBUSER}"
+
+echo "Password: ${PASSWORD}"
+
+echo
+
+echo "Random WordPress Database Prefix: ${PREFIX}_"
+
+echo
+
+echo "Please make a note of the above strings as you"
+
+echo "will need to provide them when installing WordPress"
+
+echo "------------------------------------------------------"
+
+
+
+
+
+
+
+The random WP admin username and password
+
+
+
+cat /dev/urandom | tr -dc 'a-za-z0-9' | fold -w 30 | head -n 2
+
+
+
+The WP Salts:
+
+
+
+curl -s https://api.wordpress.org/secret-key/1.1/salt/
+
+
+
+The WP directives you need tom add to wp-config.php
+
+/** Allow Direct Updating Without FTP */
+
+define('FS_METHOD', 'direct');
+
+/** Disable Editing of Themes and Plugins Using the Built In Editor */
+
+define('DISALLOW_FILE_EDIT', 'true');
+
+/** Increase WordPress Memory Limit */
+
+define('WP_MEMORY_LIMIT', '256M');
+
+/** TURN OFF AUTOMATIC UPDATES */
+
+define('WP_AUTO_UPDATE_CORE', false );
+
+
+
+DOWNLOAD WP
+
+
+
+wget https://wordpress.org/latest.tar.gz
+
+ls
+
+
+
+Use the tar command to extract the file
+
+tar xf latest.tar.gz
+
+ls
+
+
+
+A listing displays a directory called wordpress, change to that directory:
+
+cd wordpress/
+
+ls
+
+
+
+A listing displays the familiar WP files and directories. We need to rename the wp-config-dample.php file to wp-config.php. You use the mv command to rename a file
+
+
+
+mv wp-config-sample.php wp-config.php
+
+ls
+
+
+
+Move WP into the document root
+
+cd ~/wordpress/
+
+sudo mv * /var/www/example.com/public_html/
+
+
+
+Now we need to set the ownership.
+
+cd /var/www/example.com
+
+sudo chown -R www-data:www-data public_html/
+
+ls -l
+
+
+
+At this stage I need to compete the installation process using my browser.
+
+
+
+SSL
+
+
+
+sudo certbot certonly --webroot -w /var/www/example.com/public_html/ -d example.com -d www.example.com
+
+
+
+Create SSL include file:
+
+
+
+cd /etc/nginx/ssl/
+
+ls
+
+
+
+Copy your previous sites file
+
+
+
+sudo cp ssl_example.com.conf ssl_examplecom.conf
+
+sudo nano ssl_example.com.conf
+
+
+
+server {
+
+    listen 80;
+
+    server_name example.com www.example.com;
+
+    # ADD REDIRECT TO HTTPS: 301 PERMANENT 302 TEMPORARY
+
+    return 301 https://www.example.com$request_uri;
+
+}
+
+
+
+Modify existing server block:
+
+
+
+# EDIT LISTEN DIRECTIVES: ADD 443 HTTP2 AND SSL
+
+listen 443 http2 ssl;
+
+# ADD SITE AND ALL SSL INCLUDE FILES
+
+include /etc/nginx/ssl/ssl_example.com.conf;
+
+include /etc/nginx/ssl/ssl_all_sites.conf;
+
+
+
+Close nano, saving the changes.
+
+
+
+Test the nginx syntax and if the test is successful , reload nginx
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+Serve site over https only:
+
+Open your sites Dashboard and Select Settings | General and then change the WordPress Address (URL) and the Site Address (URL) from http to https. Then Save Changes. From this point all content will be served over https only.
+
+
+
+Test SSL Certificate: ssllabs.com
+
+
+
+Harden the https response headers and general WP security: open your sites server block file using nano
+
+
+
+cd /etc/nginx/sites-available/
+
+sudo nano example.com.conf
+
+include /etc/nginx/includes/http_headers.conf;
+
+include /etc/nginx/includes/wp_nginx_security_directives.conf;
+
+
+
+Implement Rate Limiting:
+
+include /etc/nginx/includes/rate_limiting.conf;
+
+
+
+Implement DDoS Protection:
+
+
+
+In your sites server block configuration file, add the limit request zone directive. You can add the directive underneath the try_files directive.
+
+limit_req zone=ip_address nodelay;
+
+
+
+Test configuration and then reload nginx
+
+
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+OWNERSHIP AND PERMISSIONS
+
+
+
+For this site, I'm going to set the owner and group owner to www-data and the permissions to 755 for directories and 644 for files.
+
+
+
+cd /var/www/example.com/
+
+sudo chown -R www-data:www-data public_html/
+
+sudo find /var/www/example.com/public_html/ -type d -exec chmod 755 {} \;
+
+sudo find /var/www/example.com/public_html/ -type f -exec chmod 644 {} \;
+
+
+
+OPTIMIZING WORDPRESS (caching)
+
+
+
+I'll be using fastcgi caching for this domain.
+
+
+
+cd /etc/nginx
+
+sudo nano nginx.conf
+
+
+
+In the FASTCGI CACHING section, add the directive:
+
+
+
+fastcgi_cache_path /var/run/SITE levels=1:2 keys_zone=NAME:100m inactive=60m;
+
+
+
+CHANGE THE PATH and the keys_zone NAME - MUST BE UNIQUE FOR THIS SITE
+
+
+
+Open your sites server block file:
+
+cd /etc/nginx/sites-available
+
+sudo nano example.com.conf
+
+
+
+Add the following directives in the php location context: NAME must match the keys_zone value set in the fastcgi_cache_path
+
+
+
+# fastcgi caching directives
+
+fastcgi_cache_bypass $skip_cache;
+
+fastcgi_no_cache $skip_cache;
+
+fastcgi_cache NAME;
+
+fastcgi_cache_valid 60m;
+
+
+
+Now we need to add the fastcgi exclusions include file and the X-FastCGI-Cache directive, add them underneath the try_files directive
+
+
+
+include /etc/nginx/includes/fastcgi_cache_excludes.conf;
+
+
+
+add_header X-FastCGI-Cache $upstream_cache_status;
+
+
+
+Under the index directive, add the fastcgi_cache_purge directive: NAME must match the keys_zone value set in the fastcgi_cache_path
+
+
+
+location ~ /purge(/.*) {
+
+    fastcgi_cache_purge NAME "$scheme$request_method$host$1";
+
+}
+
+
+
+Close nano saving your changes
+
+
+
+Open your sites wp-config.php file
+
+
+
+cd /var/www/example.com/public_html/
+
+
+
+sudo nano wp-config.php
+
+
+
+Add the NGINX HELPER CACHE PATH directive to the file, must match the fastcgi_cache_path set in nginx.conf for this site
+
+
+
+define('RT_WP_NGINX_HELPER_CACHE_PATH','/var/run/PATH/');
+
+
+
+As always, test the nginx syntax and then reload nginx to enable the change in configuration.
+
+
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+Restart the php8.1-fpm process
+
+sudo systemctl restart php8.1-fpm
+
+
+
+Open the dashboard and install NGINX Helper
+
+
+
+At this stage you can follow the CF lecture and configure CF, firstly on the server and then using the CF dashboard.
+
+
+
+ADDITIONAL SITE - SUB DOMAIN
+
+
+
+Just a reminder, there is no www cname record for a sub domain. I am creating a sub domain dev, so my url will be dev.example.com
+
+
+
+DIRECTORY STRUCTURE
+
+
+
+cd ~/bash_scripts/
+
+ls
+
+sudo ./create_dirs.sh
+
+
+
+NGINX SERVER BLOCK
+
+
+
+Change to the /etc/nginx/sites-available/ directory
+
+cd /etc/nginx/sites-available/
+
+ls
+
+sudo nano dev.example.com.conf
+
+
+
+CONTENTS:
+
+
+
+server {
+
+    listen 80;
+
+    listen [::]:80;
+
+    server_name dev.example.com;   
+
+    root /var/www/dev.example.com/public_html;   
+
+    index index.php;
+
+    location / {
+
+        try_files $uri $uri/ /index.php$is_args$args;
+
+    }
+
+    location ~ \.php$ {
+
+        include snippets/fastcgi-php.conf;
+
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+
+        include /etc/nginx/includes/fastcgi_optimize.conf;
+
+    }
+
+    include /etc/nginx/includes/browser_caching.conf;
+
+
+
+    access_log /var/log/nginx/access_dev.example.com.log combined buffer=256k flush=60m;
+
+    error_log /var/log/nginx/error_dev.example.com.log;
+
+}
+
+
+
+Now we need to create a symbolic link from sites-available/ to sites sites-enabled/. This step will enable this server server block.
+
+
+
+sudo ln -s /etc/nginx/sites-available/dev.example.com.conf /etc/nginx/sites-enabled/
+
+
+
+Test the nginx syntax and if the test is successful , reload nginx
+
+
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+INSTALL WORDPRESS
+
+
+
+The database details
+
+I'll use a script to create my db
+
+
+
+The random WP admin username and password
+
+
+
+cat /dev/urandom | tr -dc 'a-za-z0-9' | fold -w 30 | head -n 2
+
+
+
+Generate the WP Salts:
+
+
+
+curl -s https://api.wordpress.org/secret-key/1.1/salt/
+
+
+
+The WP directives you need to add to wp-config.php
+
+
+
+/** Allow Direct Updating Without FTP */
+
+define('FS_METHOD', 'direct');
+
+/** Disable Editing of Themes and Plugins Using the Built In Editor */
+
+define('DISALLOW_FILE_EDIT', 'true');
+
+/** Increase WordPress Memory Limit */
+
+define('WP_MEMORY_LIMIT', '256M');
+
+/** TURN OFF AUTOMATIC UPDATES */
+
+define('WP_AUTO_UPDATE_CORE', false );
+
+
+
+Download WP
+
+
+
+wget https://wordpress.org/latest.tar.gz
+
+ls
+
+
+
+Use the tar command to extract the file
+
+
+
+tar xf latest.tar.gz
+
+ls
+
+
+
+A listing displays a directory called wordpress, change to that directory:
+
+
+
+cd wordpress/
+
+ls
+
+
+
+A listing displays the familiar WP files and directories. We need to rename the wp-config-sample.php file to wp-config.php. You use the mv command to rename a file
+
+
+
+mv wp-config-sample.php wp-config.php
+
+ls
+
+
+
+Modify wp-config.php with above details: database, salts, prefix and directives
+
+
+
+Move WP into the document root of your site
+
+
+
+cd ~/wordpress/
+
+sudo mv * /var/www/dev.example.com/public_html/
+
+
+
+Now we need to set the ownership.
+
+
+
+cd /var/www/dev.example.com
+
+sudo chown -R www-data:www-data public_html/
+
+ls -l
+
+
+
+At this stage I need to compete the installation process using my browser.
+
+
+
+INSTALL SSL CERTIFICATE
+
+
+
+sudo certbot certonly --webroot -w /var/www/dev.example.com/public_html/ -d dev.example.com
+
+
+
+Create SSL include file:
+
+cd /etc/nginx/ssl/
+
+ls
+
+
+
+Copy your previous sites file
+
+
+
+sudo cp ssl_example.com.conf ssl_dev.example.com.conf
+
+
+
+Open in nano and change the domain name: use CTRL + \ to search and replace
+
+
+
+sudo nano ssl_dev.example.com.conf
+
+
+
+Close nano saving your changes.
+
+
+
+Now we need to create a secure server block
+
+
+
+Add http to https redirect:
+
+
+
+server {
+
+    listen 80;
+
+    server_name dev.example.com;
+
+    # ADD REDIRECT TO HTTPS: 301 PERMANENT 302 TEMPORARY
+
+    return 301 https://dev.example.com$request_uri;
+
+}
+
+
+
+Modify existing server block:
+
+
+
+# EDIT LISTEN DIRECTIVES: ADD 443 HTTP2 AND SSL
+
+listen 443 http2 ssl;
+
+listen [::]:443 http2 ssl;
+
+# ADD SITE AND ALL SSL INCLUDE FILES
+
+include /etc/nginx/ssl/ssl_dev.example.com.conf;
+
+include /etc/nginx/ssl/ssl_all_sites.conf;
+
+
+
+Close nano, saving the changes.
+
+
+
+Test the nginx syntax and if the test is successful, reload nginx
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+Serve site over https only:
+
+
+
+Open your sites WordPress Dashboard and Select Settings | General and then change the WordPress Address (URL) and the Site Address (URL) from http to https. Then Save Changes. From this point all content will be served over https only.
+
+
+
+Test SSL Certificate: ssllabs.com
+
+
+
+Harden the https response headers and general WP security: open your sites server block file using nano
+
+
+
+cd /etc/nginx/sites-available/
+
+sudo nano dev.example.com.conf
+
+Include directives:
+
+include /etc/nginx/includes/http_headers.conf;
+
+include /etc/nginx/includes/wp_nginx_security_directives.conf;
+
+Implement Rate Limiting:
+
+# Rate Limiting Include
+
+include /etc/nginx/includes/rate_limiting.conf;
+
+
+
+Implement DDoS Protection:
+
+In your sites server block configuration file, add the limit request zone directive. You can add the directive underneath the try_files directive.
+
+
+
+limit_req zone=ip_address nodelay;
+
+
+
+Test configuration and then reload nginx
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+OWNERSHIP AND PERMISSIONS
+
+For this site, i'm going to set the owner and group owner to www-data and the permissions to 755 for directories and 644 for files.
+
+
+
+cd /var/www/dev.example.com/
+
+sudo chown -R $USER:www-data public_html/
+
+sudo find /var/www/dev.example.com/public_html/ -type d -exec chmod 755 {} \;
+
+sudo find /var/www/dev.example.com/public_html/ -type f -exec chmod 644 {} \;
+
+sudo find /var/www/dev.example.com/public_html/wp-content/ -type d -exec chmod 775 {} \;
+
+sudo find /var/www/dev.example.com/public_html/wp-content/ -type f -exec chmod 664 {} \;
+
+sudo chmod 775 public_html/
+
+sudo chmod public_html/wp-config.php 664
+
+
+
+Once my site is setup, I'll change the permissions on:
+
+
+
+wp-config.php to 644
+
+public_html to 755
+
+
+
+OPTIMIZING WORDPRESS (caching)
+
+
+
+cd /var/www/dev.example.com/public_html/
+
+
+
+sudo touch nginx.conf
+
+sudo chown $USER:www-data nginx.conf
+
+sudo chmod 664 nginx.conf
+
+ls -l
+
+
+
+Permissions on wp-config.php are correct.
+
+
+
+Ensure that access to the w3tc nginx.conf file is blocked.
+
+cd /etc/nginx/includes/
+
+sudo nano wp_nginx_security_directives.conf
+
+
+
+Add the following directive to the wp_nginx_security_directives.conf file
+
+location = /nginx.conf { deny all; }
+
+
+
+We need to create a w3tc excludes file, that is a file that contains uri's that we don’t want to be cached:
+
+Change to the includes directory and create a file: w3tc_cache_excludes.conf
+
+I created this file earlier in the course, if you didnt create this file, please refer to the W3TC section of Optimizing WP
+
+
+
+cd /etc/nginx/includes/
+
+sudo nano w3tc_cache_excludes.conf
+
+
+
+This file is for the cache exclusions
+
+
+
+Contents:
+
+# ---------------------
+
+# W3 TOTAL CACHE EXCLUDES FILE
+
+# ---------------------
+
+set $cache_uri $request_uri;
+
+
+
+# POST requests and urls with a query string should always go to PHP
+
+if ($request_method = POST) {
+
+        set $cache_uri 'null cache';
+
+}   
+
+if ($query_string != "") {
+
+        set $cache_uri 'null cache';
+
+}   
+
+# Don't cache uris containing the following segments
+
+if ($request_uri ~* "(/wp-admin/|/xmlrpc.php|/wp-(app|cron|login|register|mail).php|wp-.*.php|/feed/|index.php|wp-comments-popup.php|wp-links-opml.php|wp-locations.php|sitemap(_index)?.xml|[a-z0-9_-]+-sitemap([0-9]+)?.xml)") {
+
+        set $cache_uri 'null cache';
+
+}   
+
+# Don't use the cache for logged in users or recent commenters
+
+if ($http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in") {
+
+        set $cache_uri 'null cache';
+
+}
+
+# Use cached or actual file if they exists, otherwise pass request to WordPress
+
+location / {
+
+        try_files /wp-content/w3tc/pgcache/$cache_uri/_index.html $uri $uri/ /index.php?$args;
+
+}
+
+
+
+Please take note of the last context in the file: location / we already have a location / in our sites server block file. You cannot have duplicate contexts or directives in the same context. When adding this include file in our sites server block configuration file, we will need to remove the existing location / context in the file.
+
+
+
+Comment or remove the original location / context that encloses the try_files directive. I suggest you comment the directive, just in case you are not happy with w3tc and want to remove w3tc.
+
+cd /etc/nginx/sites-available/
+
+sudo nano dev.example.com
+
+
+
+We need to add two w3tc include files, the w3tc cache exclusions and the w3tc nginx.conf file
+
+
+
+#location / {
+
+#    try_files $uri $uri/ /index.php$is_args$args;
+
+#}
+
+
+
+Underneath the http headers and wp security include files, add the w3tc includes:
+
+
+
+include /etc/nginx/includes/w3tc_excludes.conf;
+
+include /var/www/dev.example.com/public_html/nginx.conf;
+
+
+
+I also recommend you install the php8.1-tidy package, this will allow w3tc to optimise the html code. If you didn’t install it earlier, please do so now
+
+sudo apt update
+
+sudo apt install php8.1-tidy
+
+
+
+REDIS
+
+
+
+
+
+You need to edit wp-config.php' file to add a cache key salt with the name of your site.
+
+c
+
+d /var/www/dev.example.com/public_html/
+
+sudo nano wp-config.php
+
+
+
+Immediately after the WordPress unique Keys and Salts section, comment the existing directive if it exists, `WP_CACHE_SALT_KEY` and add the following with your site's url:
+
+
+
+define( 'WP_CACHE_KEY_SALT', 'dev.example.com' );
+
+
+
+When you have multiple sites on your server, adding the wp cache key salt will prevent users from being redirected to the wrong site.
+
+As always, test the nginx syntax and then reload nginx to enable the change in configuration.
+
+
+
+sudo nginx -t
+
+sudo systemctl reload nginx
+
+
+
+Restart the php8.1-fpm process
+
+
+
+sudo systemctl restart php8.1-fpm
+
+
+
+Open the WP Dashboard and install w3tc. Activate w3tc, then click settings…
+
+
+
+You need to accept the terms of use and privacy policy
+
+
+
+Make use of the setup guide and set the basic w3tc configuration.
+
+
+
+Configuration of the plugin is the same as the first site I setup. Please refer to that section.
+```
 
 
 
