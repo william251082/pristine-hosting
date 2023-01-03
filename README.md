@@ -2721,59 +2721,60 @@ filezilla
         - filezilla cannot read files in a . directory
 
 ### Use Cloudflare for DDoS protection and Ninja Firewall instead of CSP
-content security policy
-        - cross site scripting
-        - click jacking
-        - code injection attacks
-        - how does it work
-          - restrict locations
-          - white listing resources
-        IMPORTANT
-          - incorrectly setup CSP can prevent your site from loading external resources
-          - can reduce your income to zero if the location of 3rd party resources changes and
-          - the CSP is not updated
-          - after implementing CSP test your site using different browsers as support can vary
-          - especially true for safari
-        - creating a CSP
-          - csp is unique from others
-          - cover the procedure to create
-          - and implement a csp 
-          - csp directives wil differ
-          - use text editor
-          - create separate csp file to each of your sites
-          - create nginx conf include file
-          - copy and paste default csp into this file
-          - include the file in sites nginx conf file
-          - csp is typed on a single line
-          - do not split over multiple lines
-          - policy
-            - typed between ""
-            - allowed source
-            - typed between ''
-            - allowed urls
-            - not typed between ''
-            - ends with semi colon
-        - a CSP is unique to that site
-        - create and maintain a different csp for each site
-        - the csp include file is added to each sites conf file
-        - browsers dev tools
-        - console
-        - text editor
-        - visual studio
-        - before creating a CSP
-          - install wp, theme and plugins
-          - finish theme and plugin conf
-          - create or import site content
-          - configure cloudflare
-        - default csp
-          - resources are only allowed to load from your site
-          - script-src
-          - unsafe-inline
-          - unsafe-eval
-          - style-src
-          - unsafe-inline
-          - img-src and font-src
-          - embedded data
+
+- content security policy
+- cross site scripting
+- click jacking
+- code injection attacks
+- how does it work
+  - restrict locations
+  - white listing resources
+IMPORTANT
+  - incorrectly setup CSP can prevent your site from loading external resources
+  - can reduce your income to zero if the location of 3rd party resources changes and
+  - the CSP is not updated
+  - after implementing CSP test your site using different browsers as support can vary
+  - especially true for safari
+- creating a CSP
+  - csp is unique from others
+  - cover the procedure to create
+  - and implement a csp 
+  - csp directives wil differ
+  - use text editor
+  - create separate csp file to each of your sites
+  - create nginx conf include file
+  - copy and paste default csp into this file
+  - include the file in sites nginx conf file
+  - csp is typed on a single line
+  - do not split over multiple lines
+  - policy
+    - typed between ""
+    - allowed source
+    - typed between ''
+    - allowed urls
+    - not typed between ''
+    - ends with semi colon
+- a CSP is unique to that site
+- create and maintain a different csp for each site
+- the csp include file is added to each sites conf file
+- browsers dev tools
+- console
+- text editor
+- visual studio
+- before creating a CSP
+  - install wp, theme and plugins
+  - finish theme and plugin conf
+  - create or import site content
+  - configure cloudflare
+- default csp
+  - resources are only allowed to load from your site
+  - script-src
+  - unsafe-inline
+  - unsafe-eval
+  - style-src
+  - unsafe-inline
+  - img-src and font-src
+  - embedded data
 ![csp-directives.png](diagrams%2Fcsp-directives.png)
 ```
 CSP
