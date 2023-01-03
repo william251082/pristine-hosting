@@ -1211,6 +1211,7 @@ sudo openssl dhparam -out dhparam.pem 2048
 ls
 sudo vi /etc/nginx/ssl/ssl_example.com.conf
 
+
 ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
 ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
 # SSL STAPLING
@@ -2587,7 +2588,7 @@ location ^~ /random_name {
 
 location ^~ /random_name {
 # CONDITIONS
-satisfy all;
+satisfy any;
 # HTTP AUTHENTICATION
 auth_basic "Sign In";
 auth_basic_user_file /etc/nginx/includes/pma_userpass;
@@ -2595,6 +2596,10 @@ auth_basic_user_file /etc/nginx/includes/pma_userpass;
 # allow ;
 deny all;
 }
+
+all = both conditions must be satisfied for access to that location block
+any = one condition must be satisfied for access to that location block
+nginx-http-auth in the /etc/fail2ban/jail.local file --> enabled = true
 
 last -n3
 
@@ -2701,6 +2706,8 @@ filezilla
         - ssh private key to a new location
         - in your home directory
         - filezilla cannot read files in a . directory
+
+### Use Cloudflare for DDoS protection and Ninja Firewall instead of CSP
 content security policy
         - cross site scripting
         - click jacking
@@ -2818,7 +2825,7 @@ sudo nano ufw
 ```
 DENY ACCESS to SERVER IP
 - do not redirect server ip to a site
-- nging default file
+- nginx default file
 - deny access to the server ip (403)
 - return "no response" (444)
 ```
@@ -2827,7 +2834,7 @@ curl -I ip  return 403
 curl -i ip  return 444
 
 cd /etc/nginx/sites-available
-sudo nano default
+sudo vi default
  location / {
                 # First attempt to serve request as file, then
                 # as directory, then fall back to displaying a 404.
@@ -3028,308 +3035,159 @@ limit_req zone=ip_address nodelay;
 https://www.ip2location.com/free/robot-whitelist
 ```
 ### MULTIPLE SITES AND SUB DOMAINS
+- server side
+- do not repeat installations
+- install redis on the server
+- configure site to use redis
+- do not (re)install redis again for the second site
+- configure site(s) to use redis
+- include files created when installing the first site
+Hosting additional site
+- domain
+- dns
+- file and directory structure
+- nginx server block
+- install | harden | optimize
+- wp
+- dns
+- A record
+- CNAME record
+- fs
+- create site dirs
+- use script to create dirs `sudo ./create_dirs.sh`
+- nginx server blocks
+  - create non-secure nginx server block
+  - install
+    - create db 
+    - install wp
+  - harden 
+    - ssl cert
+    - permissions
+    - directives
+  - optimize wp
+    - caching
 ```
 ADDITIONAL SITE - DOMAIN
-
-
-
 DIRECTORY STRUCTURE
-
-
-
 Run the script to create your site directories, it's located in your user's home directory, in a sub directory called bash scripts
-
 cd ~/bash_scripts/
-
 ls
-
 sudo ./create_dirs.sh
 
-
-
 NGINX SERVER BLOCK
-
-
-
 We need to create a non secure server block for the new site.
-
-
-
 Change to the /etc/nginx/sites-available/ directory
 
 cd /etc/nginx/sites-available/
-
 ls
-
-sudo nano example.com.conf
-
-
+sudo vi example.com.conf
+https://api.wordpress.org/secret-key/1.1/salt/
 
 server {
-
     listen 80;
-
     listen [::]:80;
 
-
-
     server_name example.com www.example.com;   
-
-
-
     root /var/www/example.com/public_html;   
-
-
-
     index index.php;
-
-
-
     location / {
-
         try_files $uri $uri/ /index.php$is_args$args;
-
     }
-
-
-
     location ~ \.php$ {
-
         include snippets/fastcgi-php.conf;
-
         fastcgi_pass unix:/run/php/php8.1-fpm.sock;
-
         include /etc/nginx/includes/fastcgi_optimize.conf;
-
     }
-
-
-
     include /etc/nginx/includes/browser_caching.conf;
-
-
-
     access_log /var/log/nginx/access_example.com.log combined buffer=256k flush=60m;
-
     error_log /var/log/nginx/error_example.com.log;
-
 }
 
-
-
 Close nano, saving your changes.
-
-
-
 sudo ln -s /etc/nginx/sites-available/example.com.conf /etc/nginx/sites-enabled/
-
-
-
 sudo nginx -t
-
 sudo systemctl reload nginx
 
-
-
 INSTALL WORDPRESS
-
-
-
 The Database:
-
-
-
 I'll use a script to create my db:
 
-
-
 #!/bin/bash
-
-
-
 echo "What is your domain name?"
-
 read domain
-
 DB="$domain"
-
 # create random database user
-
 DBUSER="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 12 | head -n 1)"
-
 # create random password
-
 PASSWORD="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 12 | head -n 1)"
-
 # create random database prefix
-
 PREFIX="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 4 | head -n 1)"
-
 sudo mysql <<MYSQL_SCRIPT
-
 CREATE DATABASE ${DB};
-
 CREATE USER ${DBUSER}@localhost IDENTIFIED BY '${PASSWORD}';
-
 GRANT ALL PRIVILEGES ON ${DB}.* TO '${DBUSER}'@'localhost';
-
 FLUSH PRIVILEGES;
-
 MYSQL_SCRIPT
-
-
-
 echo "-------------------------------------------------------"
-
 echo "WordPress Database Credentials:"
-
 echo
-
 echo "Database: ${DB}"
-
 echo "User:     ${DBUSER}"
-
 echo "Password: ${PASSWORD}"
-
 echo
-
 echo "Random WordPress Database Prefix: ${PREFIX}_"
-
 echo
-
 echo "Please make a note of the above strings as you"
-
 echo "will need to provide them when installing WordPress"
-
 echo "------------------------------------------------------"
-
-
-
-
-
-
-
 The random WP admin username and password
 
-
-
 cat /dev/urandom | tr -dc 'a-za-z0-9' | fold -w 30 | head -n 2
-
-
-
 The WP Salts:
-
-
-
 curl -s https://api.wordpress.org/secret-key/1.1/salt/
 
-
-
 The WP directives you need tom add to wp-config.php
-
 /** Allow Direct Updating Without FTP */
-
 define('FS_METHOD', 'direct');
-
 /** Disable Editing of Themes and Plugins Using the Built In Editor */
-
 define('DISALLOW_FILE_EDIT', 'true');
-
 /** Increase WordPress Memory Limit */
-
 define('WP_MEMORY_LIMIT', '256M');
-
 /** TURN OFF AUTOMATIC UPDATES */
-
 define('WP_AUTO_UPDATE_CORE', false );
 
-
-
 DOWNLOAD WP
-
-
-
 wget https://wordpress.org/latest.tar.gz
-
 ls
-
-
-
 Use the tar command to extract the file
-
 tar xf latest.tar.gz
-
 ls
-
-
-
 A listing displays a directory called wordpress, change to that directory:
-
 cd wordpress/
-
 ls
-
-
-
 A listing displays the familiar WP files and directories. We need to rename the wp-config-dample.php file to wp-config.php. You use the mv command to rename a file
-
-
-
 mv wp-config-sample.php wp-config.php
-
 ls
-
-
-
 Move WP into the document root
-
 cd ~/wordpress/
-
 sudo mv * /var/www/example.com/public_html/
-
-
-
 Now we need to set the ownership.
 
 cd /var/www/example.com
-
 sudo chown -R www-data:www-data public_html/
-
 ls -l
-
-
-
 At this stage I need to compete the installation process using my browser.
-
-
-
 SSL
-
-
-
 sudo certbot certonly --webroot -w /var/www/example.com/public_html/ -d example.com -d www.example.com
 
-
-
 Create SSL include file:
-
-
-
 cd /etc/nginx/ssl/
-
 ls
-
-
-
 Copy your previous sites file
-
-
 
 sudo cp ssl_example.com.conf ssl_examplecom.conf
 
 sudo nano ssl_example.com.conf
-
-
 
 server {
 
@@ -3439,25 +3297,11 @@ sudo find /var/www/example.com/public_html/ -type d -exec chmod 755 {} \;
 
 sudo find /var/www/example.com/public_html/ -type f -exec chmod 644 {} \;
 
-
-
 OPTIMIZING WORDPRESS (caching)
-
-
-
 I'll be using fastcgi caching for this domain.
-
-
-
 cd /etc/nginx
-
 sudo nano nginx.conf
-
-
-
 In the FASTCGI CACHING section, add the directive:
-
-
 
 fastcgi_cache_path /var/run/SITE levels=1:2 keys_zone=NAME:100m inactive=60m;
 
@@ -3602,81 +3446,37 @@ CONTENTS:
 
 
 server {
-
     listen 80;
-
     listen [::]:80;
-
     server_name dev.example.com;   
-
     root /var/www/dev.example.com/public_html;   
-
     index index.php;
-
     location / {
-
         try_files $uri $uri/ /index.php$is_args$args;
-
     }
-
     location ~ \.php$ {
-
         include snippets/fastcgi-php.conf;
-
         fastcgi_pass unix:/run/php/php8.1-fpm.sock;
-
         include /etc/nginx/includes/fastcgi_optimize.conf;
-
     }
-
     include /etc/nginx/includes/browser_caching.conf;
-
-
-
+   
     access_log /var/log/nginx/access_dev.example.com.log combined buffer=256k flush=60m;
-
     error_log /var/log/nginx/error_dev.example.com.log;
-
 }
-
-
 
 Now we need to create a symbolic link from sites-available/ to sites sites-enabled/. This step will enable this server server block.
 
-
-
 sudo ln -s /etc/nginx/sites-available/dev.example.com.conf /etc/nginx/sites-enabled/
-
-
-
 Test the nginx syntax and if the test is successful , reload nginx
-
-
-
 sudo nginx -t
-
 sudo systemctl reload nginx
 
-
-
 INSTALL WORDPRESS
-
-
-
 The database details
-
 I'll use a script to create my db
-
-
-
 The random WP admin username and password
-
-
-
 cat /dev/urandom | tr -dc 'a-za-z0-9' | fold -w 30 | head -n 2
-
-
-
 Generate the WP Salts:
 
 
